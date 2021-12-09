@@ -3,6 +3,7 @@ export lowrankvortexassim
 
 # Create a function to perform the sequential assimilation for any sequential filter SeqFilter
 function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData;
+	                        withfreestream::Bool = false,
 							rxdefault::Int64 = 100, rydefault::Int64 = 100, israndomized::Bool=false, P::Parallel = serial) where {S<:Real}
 
 	# Define the additive Inflation
@@ -34,7 +35,7 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 
 	cachevels = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
-	h(x, t) = measure_state(x, t, config)
+	h(x, t) = measure_state(x, t, config; withfreestream = true)
 	press_itp = CubicSplineInterpolation((LinRange(real(config.ss[1]), real(config.ss[end]), length(config.ss)),
 	                                   t0:config.Δt:tf), data.yt, extrapolation_bc =  Line())
 
@@ -50,7 +51,7 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 		# Forecast step
 		@inbounds for j=1:step
 			tj = t0+(i-1)*Δtobs+(j-1)*Δtdyn
-			X, _ = vortex(X, tj, Ny, Nx, cachevels, config)
+			X, _ = vortex(X, tj, Ny, Nx, cachevels, config; withfreestream = true)
 		end
 
 		push!(Xf, deepcopy(state(X, Ny, Nx)))
@@ -86,9 +87,8 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 		# Dϵ = I
 
 		@inbounds Threads.@threads for j=1:Ne
-			J_AD = AD_symmetric_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), t0+i*Δtobs)
+			# J_AD = AD_symmetric_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), t0+i*Δtobs)
 			J = analytical_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, t0+i*Δtobs)
-			@show size(J), 3*config.Nv
 			Jj = J[:,1:3*config.Nv]
 			Cx .+= 1/(Ne-1)*(inv(Dϵ)*Jj*Dx)'*(inv(Dϵ)*Jj*Dx)
 			Cy .+= 1/(Ne-1)*(inv(Dϵ)*Jj*Dx)*(inv(Dϵ)*Jj*Dx)'
@@ -101,14 +101,14 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 		# Lbx, V = pheig(Symmetric(Cx), rank = rx)
 		# V = reverse(V, dims = 2)
 		# Λx, V = eigen(Symmetric(Cx); sortby = λ -> -λ)
-		@time V, Λx, _ = svd(Symmetric(Cx))
+		V, Λx, _ = svd(Symmetric(Cx))
 		V = V[:,1:rx]
 		# @show norm(V*V'-I), norm(V'*V-I)
 
 		# Lby, U = pheig(Symmetric(Cy), rank = ry)
 		# U = reverse(U, dims = 2)
 		# Λy, U = eigen(Symmetric(Cy); sortby = λ -> -λ)
-		@time U, Λy, _ = svd(Symmetric(Cy))
+		U, Λy, _ = svd(Symmetric(Cy))
 		U = U[:,1:ry]
 		# U = I
 
@@ -134,7 +134,7 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 		# @show cumsum(svd(Kenkf).S) ./ sum(svd(Kenkf).S)
 		# @show norm(K̆ - K̆enkf), norm(K̆ - K̆enkf)/norm(K̆enkf)
 
-		@time b̆ = (HXbrevepert*HXbrevepert' + ϵbrevepert*ϵbrevepert')\(U'*(Dϵ\(ystar .- (X[1:Ny,:] + ϵ))))
+		b̆ = (HXbrevepert*HXbrevepert' + ϵbrevepert*ϵbrevepert')\(U'*(Dϵ\(ystar .- (X[1:Ny,:] + ϵ))))
 		view(X,Ny+1:Ny+Nx,:) .+= Dx*V*(Xbrevepert*HXbrevepert')*b̆
 
 		# X = algo(X, ystar, t0+i*Δtobs)

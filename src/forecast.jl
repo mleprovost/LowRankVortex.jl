@@ -8,7 +8,7 @@ vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool = false) =
 function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestream::Bool=false)
 	Nypx, Ne = size(X)
 	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
-	
+
 	freestream = Freestream(config.U)
 
 	@inbounds for i = 1:Ne
@@ -32,9 +32,9 @@ function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestr
 	return X, t + config.Δt
 end
 
-symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config) = symmetric_vortex(X, t, Ny, Nx, cachevels, config, serial)
+symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool=false) = symmetric_vortex(X, t, Ny, Nx, cachevels, config, serial; withfreestream = withfreestream)
 
-function symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial)
+function symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestream::Bool=false)
 	Nypx, Ne = size(X)
 	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
 
@@ -46,6 +46,10 @@ function symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial)
 		reset_velocity!(cachevels, source)
 		self_induce_velocity!(cachevels[1], source[1], t)
 		induce_velocity!(cachevels[1], source[1], source[2], t)
+		
+		if withfreestream == true
+			induce_velocity!(cachevels[1], source[1], freestream, t)
+		end
 		# @. cachevels[2] = conj(cachevels[1])
 
 		# We only care about the transport of the top vortices

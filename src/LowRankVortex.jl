@@ -33,7 +33,6 @@ include("lowrankassimilation.jl")
 include("symmetric_assimilation.jl")
 include("symmetric_lowrankassimilation.jl")
 include("adaptive_symmetric_lowrankassimilation.jl")
-include("Qcriterion.jl")
 include("plot_recipes.jl")
 
 
