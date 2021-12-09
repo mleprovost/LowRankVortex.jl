@@ -1,0 +1,53 @@
+export vortex, symmetric_vortex
+
+import TransportBasedInference: Parallel, Serial, Thread
+
+
+vortex(X, t::Float64, Ny, Nx, cachevels, config) = vortex(X, t, Ny, Nx, cachevels, config, serial)
+
+function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial)
+	Nypx, Ne = size(X)
+	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
+
+	@inbounds for i = 1:Ne
+		col = view(X, Ny+1:Nypx, i)
+		source = state_to_lagrange(col, config)
+
+		# Compute the induced velocity (by exploiting the symmetry of the problem)
+		reset_velocity!(cachevels, source)
+		self_induce_velocity!(cachevels, source, t)
+
+		# Advect the system
+		advect!(source, source, cachevels, config.Δt)
+
+		X[Ny+1:Nypx, i] .= lagrange_to_state(source, config)
+	end
+
+	return X, t + config.Δt
+end
+
+symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config) = symmetric_vortex(X, t, Ny, Nx, cachevels, config, serial)
+
+function symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial)
+	Nypx, Ne = size(X)
+	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
+
+	@inbounds for i = 1:Ne
+		col = view(X, Ny+1:Nypx, i)
+		source = state_to_lagrange(col, config)
+
+		# Compute the induced velocity (by exploiting the symmetry of the problem)
+		reset_velocity!(cachevels, source)
+		self_induce_velocity!(cachevels[1], source[1], t)
+		induce_velocity!(cachevels[1], source[1], source[2], t)
+		# @. cachevels[2] = conj(cachevels[1])
+
+		# We only care about the transport of the top vortices
+		# Advect the system
+		advect!(source[1:1], source[1:1], cachevels[1:1], config.Δt)
+
+		X[Ny+1:Nypx, i] .= lagrange_to_state(source, config)
+	end
+
+	return X, t + config.Δt
+end

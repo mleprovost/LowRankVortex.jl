@@ -1,0 +1,32 @@
+*.jld2
+*.pdf
+*.zip
+*.mp4
+*.mat
+*.log
+*.aux
+*.svg
+.ipynb_checkpoints
+Manifest.toml
+
+# temporary matlab files
+*.m~
+
+# mat files
+*.mat
+
+*.csv
+
+# DS_Store files
+.DS_Store
+# Documentation build
+*.js
+*.html
+*.css
+
+data/
+notebooks/data/
+*.jld
+
+
+
