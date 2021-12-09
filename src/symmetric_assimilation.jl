@@ -1,7 +1,7 @@
 export symmetric_vortexassim
 
 # Create a function to perform the sequential assimilation for any sequential filter SeqFilter
-function symmetric_vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData; P::Parallel = serial) where {S<:Real}
+function symmetric_vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData; withfreestream::Bool = false, P::Parallel = serial) where {S<:Real}
 
 	# Define the additive Inflation
 	ϵX = config.ϵX
@@ -46,7 +46,7 @@ function symmetric_vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vo
 		# Forecast step
 		@inbounds for j=1:step
 			tj = t0+(i-1)*Δtobs+(j-1)*Δtdyn
-			X, _ = symmetric_vortex(X, tj, Ny, Nx, cachevels, config)
+			X, _ = symmetric_vortex(X, tj, Ny, Nx, cachevels, config; withfreestream = withfreestream)
 		end
 
 		push!(Xf, deepcopy(state(X, Ny, Nx)))

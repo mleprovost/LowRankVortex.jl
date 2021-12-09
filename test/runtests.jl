@@ -13,11 +13,10 @@ import PotentialFlow.Properties: @property
 import PotentialFlow.Elements: jacobian_position, jacobian_strength, jacobian_param
 
 
-include("symmetric_analytical_jacobian_pressure.jl")
-include("Qcriterion.jl")
-# include("symmetric_pressure.jl")
 # include("vortex.jl")
-# include("forecast.jl")
+include("forecast.jl")
+# include("symmetric_analytical_jacobian_pressure.jl")
+# include("symmetric_pressure.jl")
 # include("convective_complexpotential.jl")
 # include("pressure.jl")
 # include("AD_pressure.jl")

@@ -7,16 +7,18 @@
 
     Nv = 10
     Nx = 3*Nv
+    U = randn(ComplexF64)
     # Define the state
     x = rand(Nx)
     x0 = deepcopy(x)
 
     config = let Nv = Nv,
+                 U = U,
                  ss = sensors, Δt = 5e-3, δ = 1e-1,
                  ϵX = 1e-3, ϵΓ = 1e-3,
                  β = 1.0,
                  ϵY = 1e-2
-        VortexConfig(Nv, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+        VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
     end
 
     blobs = state_to_lagrange(x0, config)

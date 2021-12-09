@@ -37,7 +37,7 @@ symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool=
 function symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestream::Bool=false)
 	Nypx, Ne = size(X)
 	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
-
+	freestream = Freestream(config.U)
 	@inbounds for i = 1:Ne
 		col = view(X, Ny+1:Nypx, i)
 		source = state_to_lagrange(col, config)
@@ -46,7 +46,7 @@ function symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; w
 		reset_velocity!(cachevels, source)
 		self_induce_velocity!(cachevels[1], source[1], t)
 		induce_velocity!(cachevels[1], source[1], source[2], t)
-		
+
 		if withfreestream == true
 			induce_velocity!(cachevels[1], source[1], freestream, t)
 		end
