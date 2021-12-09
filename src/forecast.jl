@@ -3,11 +3,13 @@ export vortex, symmetric_vortex
 import TransportBasedInference: Parallel, Serial, Thread
 
 
-vortex(X, t::Float64, Ny, Nx, cachevels, config) = vortex(X, t, Ny, Nx, cachevels, config, serial)
+vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool = false) = vortex(X, t, Ny, Nx, cachevels, config, serial, withfreestream = withfreestream)
 
-function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial)
+function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestream::Bool=false)
 	Nypx, Ne = size(X)
 	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
+	
+	freestream = Freestream(config.U)
 
 	@inbounds for i = 1:Ne
 		col = view(X, Ny+1:Nypx, i)
@@ -16,6 +18,10 @@ function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial)
 		# Compute the induced velocity (by exploiting the symmetry of the problem)
 		reset_velocity!(cachevels, source)
 		self_induce_velocity!(cachevels, source, t)
+
+		if withfreestream == true
+			induce_velocity!(cachevels, source, freestream, t)
+		end
 
 		# Advect the system
 		advect!(source, source, cachevels, config.Δt)

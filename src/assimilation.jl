@@ -45,7 +45,7 @@ function (ϵ::RecipeInflation)(x::AbstractVector{Float64}, config::VortexConfig)
 end
 
 # Create a function to perform the sequential assimilation for any sequential filter SeqFilter
-function vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData; P::Parallel = serial) where {S<:Real}
+function vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData; withfreestream::Bool = false, P::Parallel = serial) where {S<:Real}
 
 	# Define the additive Inflation
 	ϵX = config.ϵX
@@ -74,7 +74,7 @@ function vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig
 
 	cachevels = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
-	h(x, t) = measure_state(x, t, config)
+	h(x, t) = measure_state(x, t, config; withfreestream = withfreestream)
 	press_itp = CubicSplineInterpolation((LinRange(real(config.ss[1]), real(config.ss[end]), length(config.ss)),
 	                                   t0:data.Δt:tf), data.yt, extrapolation_bc =  Line())
 
@@ -90,7 +90,7 @@ function vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig
 	   # Forecast step
 	   @inbounds for j=1:step
 		   tj = t0+(i-1)*Δtobs+(j-1)*Δtdyn
-		   X, _ = vortex(X, tj, Ny, Nx, cachevels, config)
+		   X, _ = vortex(X, tj, Ny, Nx, cachevels, config, withfreestream = withfreestream)
 	   end
 
 	   push!(Xf, deepcopy(state(X, Ny, Nx)))

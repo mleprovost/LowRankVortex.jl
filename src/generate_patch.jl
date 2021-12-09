@@ -48,7 +48,7 @@ function generate_patch(source, t0, tf, config::VortexConfig, path::String)
     end
 
     # Generate the observation at the same time
-    data = SyntheticData(tt, x0, xt, yt)
+    data = SyntheticData(tt, config.Δt, x0, xt, yt)
 
     save(path*"data_vortex_patch.jld", "tt", tt, "x0", x0, "xt", xt, "yt", yt)
 

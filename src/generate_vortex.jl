@@ -41,7 +41,7 @@ function generate_vortex(source, t0, tf, config::VortexConfig, path::String)
 
         # Perturb the state
         ϵinfl(view(xt,:,i+1), config)
-        source = deepcopy(state_to_lagrange(xt[:,i+1], config.zs, config))
+        source = deepcopy(state_to_lagrange(xt[:,i+1], config))
         # Compute pressure field
         yt[:,i+1] .= pressure(config.ss, source, freestream, t0+i*config.Δt)
         yt[:,i+1] .+= config.ϵY*randn(Ny)
@@ -49,9 +49,9 @@ function generate_vortex(source, t0, tf, config::VortexConfig, path::String)
     end
 
     # Generate the observation at the same time
-    data = SyntheticData(tt, x0, xt, yt)
+    data = SyntheticData(tt, config.Δt, x0, xt, yt)
 
-    save(path*"data_test.jld", "tt", tt, "x0", x0, "xt", xt, "yt", yt)
+    save(path*"data_test.jld", "tt", tt, "Δt", config.Δt, "x0", x0, "xt", xt, "yt", yt)
 
     return data
 end
