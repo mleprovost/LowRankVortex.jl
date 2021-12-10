@@ -64,15 +64,15 @@ function symmetric_pressure(target::Vector{Float64}, source::T, freestream, t) w
 
     # Quadratic term
 
-    @inbounds for (J, bJ) in enumerate(source)
-        tmpJ = bJ.S*imag(bJ.z)
-        for (i, xi) in enumerate(target)
-            diJ = inv(abs2(xi-bJ.z))
-            press[i] += tmpJ*diJ
-        end
-    end
-	press .=  0.5*deepcopy(abs2.(1/π*press .+ conj(U)))
-    # press .= -0.5*deepcopy(1/π^2*abs2.(press) .+ abs2(conj(U)) + 2*press*real(conj(U)))
+    # @inbounds for (J, bJ) in enumerate(source)
+    #     tmpJ = bJ.S*imag(bJ.z)
+    #     for (i, xi) in enumerate(target)
+    #         diJ = inv(abs2(xi-bJ.z))
+    #         press[i] += tmpJ*diJ
+    #     end
+    # end
+	#
+	# press .=  -0.5*deepcopy(abs2.(1/π*press .+ conj(U)))
 
 	sourcevels = zeros(ComplexF64, Nv)
     @inbounds for (J, bJ) in enumerate(source)
@@ -88,7 +88,7 @@ function symmetric_pressure(target::Vector{Float64}, source::T, freestream, t) w
         # Contribution of the mirrored vortex
         sourcevels[J] += ΓJ/(4*π*imag(zJ)) + conj(U)
     end
-
+	@show sourcevels
     # Unsteady term
     @inbounds for (J, bJ) in enumerate(source)
         zJ = bJ.z
