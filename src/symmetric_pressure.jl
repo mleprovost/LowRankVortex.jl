@@ -3,7 +3,13 @@
 export measure_state_symmetric, symmetric_pressure#, analytical_symmetric_jacobian_strength
 
 function measure_state_symmetric(state, t, config::VortexConfig; withfreestream::Bool = false)
-    return symmetric_pressure(real(config.ss), state_to_lagrange(state, config)[1], t; withfreestream = withfreestream)
+	if withfreestream == false
+    	return symmetric_pressure(real(config.ss), state_to_lagrange(state, config)[1], t)
+	else
+		@show "hello"
+		freestream = Freestream(config.U)
+		return symmetric_pressure(real(config.ss), state_to_lagrange(state, config)[1], freestream, t)
+	end
 end
 
 # Symmetric pressure calculation for point vortices
@@ -63,16 +69,15 @@ function symmetric_pressure(target::Vector{Float64}, source::T, freestream, t) w
     press = zeros(Ny)
 
     # Quadratic term
+    @inbounds for (J, bJ) in enumerate(source)
+        tmpJ = bJ.S*imag(bJ.z)
+        for (i, xi) in enumerate(target)
+            diJ = inv(abs2(xi-bJ.z))
+            press[i] += tmpJ*diJ
+        end
+    end
 
-    # @inbounds for (J, bJ) in enumerate(source)
-    #     tmpJ = bJ.S*imag(bJ.z)
-    #     for (i, xi) in enumerate(target)
-    #         diJ = inv(abs2(xi-bJ.z))
-    #         press[i] += tmpJ*diJ
-    #     end
-    # end
-	#
-	# press .=  -0.5*deepcopy(abs2.(1/π*press .+ conj(U)))
+	press .=  -0.5*deepcopy(abs2.(1/π*press .+ conj(U)))
 
 	sourcevels = zeros(ComplexF64, Nv)
     @inbounds for (J, bJ) in enumerate(source)
@@ -88,7 +93,7 @@ function symmetric_pressure(target::Vector{Float64}, source::T, freestream, t) w
         # Contribution of the mirrored vortex
         sourcevels[J] += ΓJ/(4*π*imag(zJ)) + conj(U)
     end
-	@show sourcevels
+
     # Unsteady term
     @inbounds for (J, bJ) in enumerate(source)
         zJ = bJ.z
@@ -175,11 +180,9 @@ function symmetric_pressure(target::Vector{Float64}, source::T, freestream, t) w
             diJ = abs2(xi - zJ) + δ^2
             press[i] += tmpJ/diJ
 		end
-		press .*= 1/π
-		press .+= conj(U)
 	end
 
-	press .= deepcopy(-0.5*press.^2)
+	press .=  -0.5*deepcopy(abs2.(1/π*press .+ conj(U)))
 
     sourcevels = zeros(ComplexF64, Nv)
     @inbounds for (J, bJ) in enumerate(source)

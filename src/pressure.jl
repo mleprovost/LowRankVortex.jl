@@ -45,13 +45,12 @@ function pressure!(press, targetvels, sourcevels, target, source, freestream, t)
     # Compute the self-induced velocity of the system
     self_induce_velocity!(sourcevels, source, t)
     induce_velocity!(sourcevels, source, freestream, t)
-    @show sourcevels
     # Compute the induced velocity on the target elements
     induce_velocity!(targetvels, target, (source, freestream), t)
 
     #Only the vortices contribute to the unsteady term
     press .= -real.(convective_complexpotential(target, source, sourcevels))
-    # press .+= -0.5*abs2.(targetvels)
+    press .+= -0.5*abs2.(targetvels)
 
     return press
 end
