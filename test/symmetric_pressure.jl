@@ -26,7 +26,6 @@ end
     zv = randn(Nv) + im *rand(Nv)
     Sv = randn(Nv)
     δ = 0.5
-    @show "dah"
 
     blobs₊ = Vortex.Blob.(zv, Sv, δ*ones(Nv))
     blobs₋ = Vortex.Blob.(conj(zv), -Sv, δ*ones(Nv))
@@ -52,13 +51,15 @@ end
 
     xsensors = collect(-2.0:0.5:10)
     sensors = complex(xsensors)
+    U = complex(0.0)
 
     config = let Nv = Nv,
+         U = U,
          ss = sensors, Δt = 1e-3, δ = 5e-2,
          ϵX = 1e-3, ϵΓ = 1e-4,
          β = 1.0,
          ϵY = 1e-16
-         VortexConfig(Nv, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+         VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
     end
 
     sys = state_to_lagrange(x, config)

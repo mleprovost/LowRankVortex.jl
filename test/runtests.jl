@@ -1,7 +1,7 @@
 using Test
 
 using LinearAlgebra, Statistics
-using VortexPatch
+using LowRankVortex
 using TransportBasedInference
 using ForwardDiff
 using PotentialFlow
@@ -14,10 +14,10 @@ import PotentialFlow.Elements: jacobian_position, jacobian_strength, jacobian_pa
 
 
 # include("vortex.jl")
-include("forecast.jl")
-# include("symmetric_analytical_jacobian_pressure.jl")
-# include("symmetric_pressure.jl")
+# include("forecast.jl")
 # include("convective_complexpotential.jl")
 # include("pressure.jl")
+include("symmetric_pressure.jl")
+# include("symmetric_analytical_jacobian_pressure.jl")
 # include("AD_pressure.jl")
 # include("analytical_pressure.jl")

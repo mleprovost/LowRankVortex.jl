@@ -50,7 +50,8 @@ function pressure!(press, targetvels, sourcevels, target, source, freestream, t)
     induce_velocity!(targetvels, target, (source, freestream), t)
 
     #Only the vortices contribute to the unsteady term
-    press .= -real.(convective_complexpotential(target, source, sourcevels)) -0.5*abs2.(targetvels)
+    # press .= -real.(convective_complexpotential(target, source, sourcevels)) 
+    press .= -0.5*abs2.(targetvels)
 
     return press
 end
@@ -100,6 +101,30 @@ function pressure_AD(target, source, t)
 
     targetvels = zeros(Complex{Elements.property_type(eltype(source))},length(target))
     induce_velocity!(targetvels, target, source, t)
+
+    press = zeros(Complex{Elements.property_type(eltype(source))}, length(target))
+
+    # Unsteady term (only the vortices contribute)
+    convective_complexpotential!(press, target, source, sourcevels)
+    press .= -real(press)
+
+    # Convective term
+    press .-= 0.5*abs2.(targetvels)
+
+    return press
+end
+
+function pressure_AD(target, source, freestream, t)
+
+    source = deepcopy(source)
+
+    sourcevels = zeros(Complex{Elements.property_type(eltype(source))},length(source))
+    self_induce_velocity!(sourcevels, source, t)
+    induce_velocity!(sourcevels, source, freestream, t)
+
+
+    targetvels = zeros(Complex{Elements.property_type(eltype(source))},length(target))
+    induce_velocity!(targetvels, target, (source, freestream), t)
 
     press = zeros(Complex{Elements.property_type(eltype(source))}, length(target))
 
