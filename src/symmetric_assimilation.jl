@@ -30,7 +30,7 @@ function symmetric_vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vo
 
 	cachevels = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
-	h(x, t) = measure_state_symmetric(x, t, config)
+	h(x, t) = measure_state_symmetric(x, t, config; withfreestream =  withfreestream)
 	press_itp = CubicSplineInterpolation((LinRange(real(config.ss[1]), real(config.ss[end]), length(config.ss)),
 	                               t0:data.Δt:tf), data.yt, extrapolation_bc =  Line())
 

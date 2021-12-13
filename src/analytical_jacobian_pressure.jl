@@ -141,7 +141,7 @@ function analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, wtarget, target
         end
 
         # Construct the Cauchy matrix to store 1/(z-zJ) and the total induced velocity in Cts and wtarget
-        @avx for J=1:Nx
+        for J=1:Nx
             zJ = source[J].z
             SJ = -im*source[J].S
             for i=1:Ny
@@ -153,7 +153,7 @@ function analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, wtarget, target
     end
 
     # Evaluate ∂(-0.5v^2)/∂SL, ∂(-0.5v^2)/∂S̄L
-    @avx for L in idx #1:Nx
+    for L in idx #1:Nx
         zL = source[L].z
         SL = -im*source[L].S
         for i=1:Ny
@@ -284,7 +284,7 @@ function analytical_jacobian_position!(dpdz, dpdzstar, Css, Cts, wtarget, target
         zL = source[L].z
         SL = -im*source[L].S
         for i=1:Ny
-            wt = wtarget[i] + conj(U)
+            wt = wtarget[i] #+ conj(U)
             dpdz[i,L] = -0.5*conj(wt)*SL*cst*Cts[i,L]^2
             # dpdzstar[i,L] = conj(dpdz[i,L])
         end
