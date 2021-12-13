@@ -6,7 +6,6 @@ function measure_state_symmetric(state, t, config::VortexConfig; withfreestream:
 	if withfreestream == false
     	return symmetric_pressure(real(config.ss), state_to_lagrange(state, config)[1], t)
 	else
-		@show "hello"
 		freestream = Freestream(config.U)
 		return symmetric_pressure(real(config.ss), state_to_lagrange(state, config)[1], freestream, t)
 	end

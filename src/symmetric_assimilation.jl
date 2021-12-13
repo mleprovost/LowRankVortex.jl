@@ -42,7 +42,7 @@ function symmetric_vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vo
 	push!(Xa, copy(state(X, Ny, Nx)))
 
 	# Run particle filter
-	for i=1:length(Acycle)
+	@showprogress for i=1:length(Acycle)
 		# Forecast step
 		@inbounds for j=1:step
 			tj = t0+(i-1)*Δtobs+(j-1)*Δtdyn

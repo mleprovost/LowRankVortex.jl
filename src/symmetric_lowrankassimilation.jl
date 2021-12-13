@@ -3,7 +3,8 @@ export symmetric_lowrankvortexassim
 
 # Create a function to perform the sequential assimilation for any sequential filter SeqFilter
 function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData;
-							rxdefault::Int64 = 100, rydefault::Int64 = 100, israndomized::Bool=false, P::Parallel = serial) where {S<:Real}
+	                        withfreestream::Bool=false, rxdefault::Int64 = 100, rydefault::Int64 = 100,
+							israndomized::Bool=false, P::Parallel = serial) where {S<:Real}
 
 	# Define the additive Inflation
 	ϵX = config.ϵX
@@ -31,11 +32,11 @@ function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, con
 	Nv = config.Nv
 	ystar = zeros(Ny)
 
-	freestream = Freestream(0.0*im)
-
 	cachevels = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
-	h(x, t) = measure_state_symmetric(x, t, config)
+	freestream = Freestream(config.U)
+
+	h(x, t) = measure_state_symmetric(x, t, config; withfreestream = withfreestream)
 	press_itp = CubicSplineInterpolation((LinRange(real(config.ss[1]), real(config.ss[end]), length(config.ss)),
 	                                   t0:data.Δt:tf), data.yt, extrapolation_bc =  Line())
 
@@ -65,7 +66,7 @@ function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, con
 		# Forecast step
 		@inbounds for j=1:step
 			tj = t0+(i-1)*Δtobs+(j-1)*Δtdyn
-			X, _ = symmetric_vortex(X, tj, Ny, Nx, cachevels, config)
+			X, _ = symmetric_vortex(X, tj, Ny, Nx, cachevels, config; withfreestream = withfreestream)
 		end
 
 		push!(Xf, deepcopy(state(X, Ny, Nx)))
@@ -105,9 +106,14 @@ function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, con
 			# Jac = analytical_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
 			# analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
 			#                               config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
-
-		    symmetric_analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
-			                              config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), 1:config.Nv, t0+i*Δtobs)
+			if withfreestream == false
+			    symmetric_analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
+				                              config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), 1:config.Nv, t0+i*Δtobs)
+			else
+				symmetric_analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
+				                              config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream,
+											  1:config.Nv, t0+i*Δtobs)
+			end
 
 			# @show Jac_AD[1:3,1:3]
 			# @show Jac[1:3,1:3]
