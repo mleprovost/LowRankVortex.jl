@@ -140,7 +140,7 @@ Returns the Jacobian of the pressure computed from the unsteady Bernoulli equati
 Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
 """
 function symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Cts, Ctsblob, ∂Ctsblob, wtarget, target::Vector{Float64}, source::T,
-									             idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t;
+									             idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, freestream, t;
                                                  iscauchystored::Bool = false) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Ny = size(target, 1)
 	Nx = size(source, 1)
@@ -149,6 +149,7 @@ function symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Ct
 
 	δ = source[1].δ
 
+	U = freestream.U
 	cst = inv(2*π)
 
 	# @assert size(dpdz) == (Ny, Nx) && size(dpdzstar) == (Ny, Nx) && size(Css) == (Nx, Nx) && size(Cts) == (Ny, Nx) && size(wtarget) == (Ny,)
@@ -250,6 +251,7 @@ function symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Ct
 	       end
 	   end
 	   wtarget .*= (1/π)
+	   wtarget .+= real(conj(U))
 	end
 
 	# Evaluate ∂(-∂ϕ/∂t)/∂zL, ∂(-∂ϕ/∂t)/∂z̄L
@@ -302,6 +304,14 @@ function symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Ct
 	# dpdz[:,idx] .+= conj(Cts) .* (im*Γ') .*  (Css .^2 .* -im*Γ')
 
 	dpdz[:,idx] .*=  0.5*cst^2
+
+	# Freestream contribution
+	@inbounds for L in idx #1:Nx
+		SL = -im*source[L].S
+		for i=1:Ny
+			dpdz[i,L] += 0.5*cst*SL*Cts[i,L]^2*U
+		end
+	end
 
 	# Evaluate ∂(-0.5v^2)/∂zL, ∂(-0.5v^2)/∂z̄L
 	@inbounds for L in idx #1:Nx
