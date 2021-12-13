@@ -10,7 +10,7 @@ Returns the Jacobian of the pressure computed from the unsteady Bernoulli equati
 Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
 """
 function symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, Cts, wtarget, target::Vector{Float64}, source::T,
-	                                   idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, freestream, t;
+	                                   freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t;
                                        iscauchystored::Bool = false) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 	Nx = size(source, 1)
 	@assert mod(Nx, 2) == 0
@@ -140,7 +140,7 @@ Returns the Jacobian of the pressure computed from the unsteady Bernoulli equati
 Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
 """
 function symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Cts, Ctsblob, ∂Ctsblob, wtarget, target::Vector{Float64}, source::T,
-									             idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, freestream, t;
+									             freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t;
                                                  iscauchystored::Bool = false) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Ny = size(target, 1)
 	Nx = size(source, 1)
@@ -335,8 +335,8 @@ end
 function symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, Cts, wtarget, target::Vector{Float64}, source::T, freestream, t;
                                                  iscauchystored::Bool = false) where T <:Vector{PotentialFlow.Points.Point{Float64, Float64}}
 
-	symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, Cts, wtarget, target, source,
-	                                        1:length(source), freestream, t; iscauchystored = iscauchystored)
+	symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, Cts, wtarget, target, source, freestream,
+	                                        1:length(source), t; iscauchystored = iscauchystored)
 end
 
 function symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Cts, Ctsblob, ∂Ctsblob,
@@ -344,13 +344,13 @@ function symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Ct
                                                  iscauchystored::Bool = false) where T <:Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 
 	symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Cts, Ctsblob, ∂Ctsblob,
-		                                    wtarget, target, source,
-	                                        1:length(source), freestream, t; iscauchystored = iscauchystored)
+		                                    wtarget, target, source, freestream,
+	                                        1:length(source), t; iscauchystored = iscauchystored)
 end
 
 
-function symmetric_analytical_jacobian_position(target::Vector{Float64}, source,
-									            idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, freestream, t)
+function symmetric_analytical_jacobian_position(target::Vector{Float64}, source, freestream,
+									            idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t)
    Ny = size(target, 1)
    Nx = size(source, 1)
    # Create allocations for the Cauchy matrices
@@ -362,27 +362,28 @@ function symmetric_analytical_jacobian_position(target::Vector{Float64}, source,
    dpdzstar = zeros(ComplexF64, Ny, Nx)
 
 	if typeof(source)<:Vector{PotentialFlow.Points.Point{Float64, Float64}}
-	    symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, Cts, wtarget, target, source, idx, freestream, t;
+	    symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, Cts, wtarget, target, source, freestream, idx, t;
 	                                  iscauchystored = false)
 	elseif typeof(source)<:Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 		∂Css = zeros(Nx, Nx)
 		Ctsblob = zeros(ComplexF64, Ny, Nx)
 		∂Ctsblob = zeros(Ny, Nx)
-		symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Cts, Ctsblob, ∂Ctsblob, wtarget, target, source, idx, freestream, t;
+		symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Cts, Ctsblob, ∂Ctsblob, wtarget, target, source, freestream, idx, t;
 									  iscauchystored = false)
 	end
 
    return dpdz, dpdzstar
 end
 
-symmetric_analytical_jacobian_position(target::Vector{Float64}, source, freestream, t) = symmetric_analytical_jacobian_position(target, source, 1:length(source), freestream, t)
+symmetric_analytical_jacobian_position(target::Vector{Float64}, source, freestream, t) = symmetric_analytical_jacobian_position(target, source, freestream,
+                                                                                                                                1:length(source), t)
 
 """
 Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the strength and conjugate strength of the singularities.
 Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to S = Q-iΓ.
 """
 function symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, wtarget, target::Vector{Float64}, source::T,
-	                                   idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, freestream, t;
+	                                   freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t;
                                        iscauchystored::Bool = false) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 	Ny = size(target, 1)
     Nx = size(source, 1)
@@ -390,6 +391,7 @@ function symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, wtarg
 	halfNx = Nx÷2
 
     cst = inv(2*π)
+	U = freestream.U
 
     # @assert size(dpdS) == (Ny, Nx) && size(dpdSstar) == (Ny, Nx) && size(Css) == (Nx, Nx) && size(Cts) == (Ny, Nx) && size(wtarget) == (Ny,)
 
@@ -455,10 +457,11 @@ function symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, wtarg
  			end
  		end
  		wtarget .*= 2*cst
+		wtarget .+= real(conj(U))
     end
 
     # Evaluate ∂(-0.5v^2)/∂SL, ∂(-0.5v^2)/∂S̄L
-    @avx for L in idx #1:Nx
+    for L in idx #1:Nx
         zL = source[L].z
         SL = -im*source[L].S
         for i=1:Ny
@@ -492,6 +495,10 @@ function symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, wtarg
 	            end
 			end
         end
+		# Freestream contribution
+		for i=1:Ny
+			dpdS[i,L] += 0.5*cst*Cts[i,L]*U
+		end
     end
 	dpdSstar .= conj(dpdS)
     nothing
@@ -504,8 +511,8 @@ end
 ###############################################################################################
 
 
-function symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsblob, wtarget, target::Vector{Float64}, source::T,
-	                                   idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, freestream, t;
+function symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsblob, wtarget, target::Vector{Float64},
+	                                             source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t;
 	                       iscauchystored::Bool = false, issourcefixed::Bool = false) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Ny = size(target, 1)
 	Nx = size(source, 1)
@@ -515,6 +522,7 @@ function symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsbl
 	δ = source[1].δ
 
 	cst = inv(2*π)
+	U = freestream.U
 
 	# @assert size(dpdS) == (Ny, Nx) && size(dpdSstar) == (Ny, Nx) && size(Css) == (Nx, Nx) && size(Cts) == (Ny, Nx) && size(wtarget) == (Ny,)
 
@@ -590,6 +598,7 @@ function symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsbl
 			end
 		end
 		wtarget .*= (1/π)
+		wtarget .+= real(conj(U))
 	end
 
 	# Evaluate ∂(-∂ϕ/∂t)/∂SL, ∂(-∂ϕ/∂t)/∂S̄L
@@ -617,28 +626,33 @@ function symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsbl
 
 	# Evaluate ∂(-0.5v^2)/∂SL, ∂(-0.5v^2)/∂S̄L
 	@inbounds dpdS[:,idx] .+= -0.5*cst*(wtarget .* Ctsblob[:,idx])
-	# @inbounds for i=1:Ny
-	# 	dpdS[i,:] .= -0.5*cst*wtarget[i]
-	# 	for L in idx
-	# 		dpdS[i,L] *= Ctsblob[i,L]
-	# 		# dpdSstar[i,L] = conj(dpdS[i,L])
+
+	# @inbounds for L in idx
+	# 	SL = -im*source[L].S
+	# 	for i=1:Ny
+	# 		dpdS[i,L] .+= 0.5*cst*Cts[i,L]*U
 	# 	end
 	# end
-
+	for L in idx
+		# Freestream contribution
+		for i=1:Ny
+			dpdS[i,L] += 0.5*cst*Cts[i,L]*U
+		end
+	end
 	dpdSstar .= conj(dpdS)
 	nothing
 end
 
 symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsblob, wtarget, target::Vector{Float64}, source, freestream, t;
 	                          iscauchystored::Bool = false) =
-symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsblob, wtarget, target, source, 1:length(source), freestream, t;
+symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsblob, wtarget, target, source, freestream, 1:length(source), t;
 							  iscauchystored = iscauchystored)
 
 symmetric_analytical_jacobian_strength(target::Vector{Float64}, source, freestream, t) =
-symmetric_analytical_jacobian_strength(target, source, 1:length(source), freestream, t)
+symmetric_analytical_jacobian_strength(target, source, freestream, 1:length(source), t)
 
-function symmetric_analytical_jacobian_strength(target::Vector{Float64}, source,
-	                                  idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, freestream, t)
+function symmetric_analytical_jacobian_strength(target::Vector{Float64}, source, freestream,
+	                                  idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t)
 	Ny = size(target, 1)
 	Nx = size(source, 1)
 	Css = zeros(ComplexF64, Nx, Nx)
@@ -648,11 +662,11 @@ function symmetric_analytical_jacobian_strength(target::Vector{Float64}, source,
 	dpdS = zeros(ComplexF64, Ny, Nx)
 	dpdSstar = zeros(ComplexF64, Ny, Nx)
 	if typeof(source)<:Vector{PotentialFlow.Points.Point{Float64, Float64}}
-		symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, wtarget, target, source, idx, t;
+		symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, wtarget, target, source, freestream, idx, t;
 	                                            iscauchystored = false)
 	elseif typeof(source)<:Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 		Ctsblob = zeros(ComplexF64, Ny, Nx)
-		symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsblob, wtarget, target, source, idx, t;
+		symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsblob, wtarget, target, source, freestream, idx, t;
 									            iscauchystored = false)
 	end
 
@@ -661,11 +675,11 @@ end
 
 
 symmetric_analytical_jacobian_pressure(target, source, freestream, t) =
-symmetric_analytical_jacobian_pressure(target, source, 1:length(source), freestream, t)
+symmetric_analytical_jacobian_pressure(target, source, freestream, 1:length(source), t)
 
 # Version with allocations for point vortices
-function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}},
-	                                            freestream, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
+function symmetric_analytical_jacobian_pressure(target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}},
+	                                            t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 	Nv = size(source, 1)
 	Nx = 3*Nv
 	Ny = size(target, 1)
@@ -680,14 +694,14 @@ function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{In
 	Css = zeros(ComplexF64, Nv, Nv)
 	Cts = zeros(ComplexF64, Ny, Nv)
 
-	symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source, idx, t)
+	symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source, freestream, idx, t)
 	return J
 end
 
 
 # Version with allocations for regularized vortices
-function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}},
-	                                            freestream, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
+function symmetric_analytical_jacobian_pressure(target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}},
+	                                            t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Nv = size(source, 1)
 	Nx = 3*Nv
 	Ny = size(target, 1)
@@ -706,7 +720,7 @@ function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{In
 	Ctsblob = zeros(ComplexF64, Ny, Nv)
 	∂Ctsblob = zeros(Ny, Nv)
 
-	symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source, idx, freestream, t)
+	symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source, freestream, idx, t)
 	return J
 end
 
@@ -717,7 +731,7 @@ end
 
 # In-place version for regularized vortices
 function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source::T,
-	                                             idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, freestream, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
+	                                             freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Ny = size(target, 1)
 	Nx = size(source, 1)
 	@assert mod(Nx, 2) == 0
@@ -923,7 +937,7 @@ end
 
 # In-place version for point vortices
 function symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source::T,
-	                                             idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, freestream, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
+	                                             freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 	Nv = size(source, 1)
 	Nx = 3*Nv
 	Ny = size(target, 1)
@@ -997,14 +1011,14 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, 
 		end
 	end
 
-	symmetric_analytical_jacobian_position!(dpd, dpdstar, Css, Cts, wtarget, target, src, idx, freestream, t;
+	symmetric_analytical_jacobian_position!(dpd, dpdstar, Css, Cts, wtarget, target, src, freestream, idx, t;
 								  iscauchystored = true)
 
 	# Fill dpdpx and dpdy
 	J[:, 1:3:3*(Nv-1)+1] .= 2*real.(dpd[:,1:Nv])
 	J[:, 2:3:3*(Nv-1)+2] .= -2*imag.(dpd[:,1:Nv])
 
-	symmetric_analytical_jacobian_strength!(dpd, dpdstar, Css, Cts, wtarget, target, src, idx, freestream, t;
+	symmetric_analytical_jacobian_strength!(dpd, dpdstar, Css, Cts, wtarget, target, src, freestream, idx, t;
 								  iscauchystored = true)
 
 	# Vortices
