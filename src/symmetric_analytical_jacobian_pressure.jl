@@ -440,7 +440,7 @@ function symmetric_analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, wtarg
     end
 
     # Evaluate ∂(-0.5v^2)/∂SL, ∂(-0.5v^2)/∂S̄L
-    @avx for L in idx #1:Nx
+    for L in idx #1:Nx
         zL = source[L].z
         SL = -im*source[L].S
         for i=1:Ny

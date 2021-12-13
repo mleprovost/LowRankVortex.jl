@@ -177,7 +177,7 @@ end
     Ny = length(sensors)
 
     U = randn() + 0.0*im
-    freestream = Freestream(0.0*im);
+    freestream = Freestream(U);
 
     config = let Nv = Nv,
              U = U,

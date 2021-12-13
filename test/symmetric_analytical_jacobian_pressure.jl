@@ -14,14 +14,16 @@
     sensors = complex(xsensors)
     Ny = length(sensors)
 
-    freestream = Freestream(0.0*im);
+    U = complex(0.0)
+    freestream = Freestream(U);
 
     config = let Nv = Nv,
+             U = U,
              ss = sensors, Δt = 1e-3, δ = 5e-2,
              ϵX = 1e-3, ϵΓ = 1e-4,
              β = 1.0,
              ϵY = 1e-16
-            VortexConfig(Nv, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+            VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
     end
 
     sys = state_to_lagrange(x, config; isblob = false)
@@ -52,14 +54,16 @@ end
     sensors = complex(xsensors)
     Ny = length(sensors)
 
-    freestream = Freestream(0.0*im);
+    U = complex(0.0)
+    freestream = Freestream(U);
 
     config = let Nv = Nv,
+             U = U,
              ss = sensors, Δt = 1e-3, δ = 0.1,
              ϵX = 1e-3, ϵΓ = 1e-4,
              β = 1.0,
              ϵY = 1e-16
-            VortexConfig(Nv, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+            VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
     end
 
     sys = state_to_lagrange(x, config; isblob = true)
@@ -90,14 +94,16 @@ end
     sensors = complex(xsensors)
     Ny = length(sensors)
 
-    freestream = Freestream(0.0*im);
+    U = complex(0.0)
+    freestream = Freestream(U);
 
     config = let Nv = Nv,
+             U = U,
              ss = sensors, Δt = 1e-3, δ = 5e-2,
              ϵX = 1e-3, ϵΓ = 1e-4,
              β = 1.0,
              ϵY = 1e-16
-            VortexConfig(Nv, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+            VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
     end
 
     sys = state_to_lagrange(x, config; isblob = false)
@@ -127,14 +133,16 @@ end
     sensors = complex(xsensors)
     Ny = length(sensors)
 
-    freestream = Freestream(0.0*im);
+    U = complex(0.0)
+    freestream = Freestream(U);
 
     config = let Nv = Nv,
+             U = U,
              ss = sensors, Δt = 1e-3, δ = 5e-2,
              ϵX = 1e-3, ϵΓ = 1e-4,
              β = 1.0,
              ϵY = 1e-16
-            VortexConfig(Nv, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+            VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
     end
 
     sys = state_to_lagrange(x, config; isblob = true)
@@ -163,14 +171,16 @@ end
     sensors = complex(xsensors)
     Ny = length(sensors)
 
-    freestream = Freestream(0.0*im);
+    U = complex(0.0)
+    freestream = Freestream(U);
 
     config = let Nv = Nv,
+             U = U,
              ss = sensors, Δt = 1e-3, δ = 5e-2,
              ϵX = 1e-3, ϵΓ = 1e-4,
              β = 1.0,
              ϵY = 1e-16
-            VortexConfig(Nv, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+            VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
     end
 
     sys = state_to_lagrange(x, config; isblob = true)

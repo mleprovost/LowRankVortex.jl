@@ -740,6 +740,7 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Ct
 	δ = source[1].δ
 
 	cst = inv(2*π)
+	U = freestream.U
 
 	# @assert size(dpdS) == (Ny, Nx) && size(dpdSstar) == (Ny, Nx) && size(Css) == (Nx, Nx) && size(Cts) == (Ny, Nx) && size(wtarget) == (Ny,)
 
@@ -841,6 +842,7 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Ct
 		end
 	end
 	wtarget .*= (1/π)
+	wtarget .+= real(conj(U))
 
 	# Evaluate ∂(-∂ϕ/∂t)/∂zL, ∂(-∂ϕ/∂t)/∂z̄L
 	@inbounds for L in idx #1:Nx
@@ -895,9 +897,10 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Ct
 		   wt = wtarget[i]
 		   # Exploit the fact that w(xi) is real
 		   dpdz[i,L] -= 0.5*wt*cst*SL*(Ctsblob[i,L]^2-∂Ctsblob[i,L])
+		   # Freestream contribution
+		   dpdz[i,L] += 0.5*cst*SL*Cts[i,L]^2*U
 	   end
 	end
-
 
 	# Evaluate ∂(-∂ϕ/∂t)/∂SL, ∂(-∂ϕ/∂t)/∂S̄L
 	# @inbounds dpdS[:,idx] .+= Cts[:,idx] .* conj(Css[idx,:] * (-im*Γ))'
@@ -923,6 +926,13 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Ct
 	# Evaluate ∂(-0.5v^2)/∂SL, ∂(-0.5v^2)/∂S̄L
 	@inbounds dpdS[:,idx] .+= -0.5*cst*(wtarget .* Ctsblob[:,idx])
 
+	for L in idx
+		# Freestream contribution
+		for i=1:Ny
+			dpdS[i,L] += 0.5*cst*Cts[i,L]*U
+		end
+	end
+
 	@inbounds for L in idx
 		J[:, 3*(L-1)+1] .= 2*real.(view(dpdz,:,L))
 		J[:, 3*(L-1)+2] .= -2*imag.(view(dpdz,:,L))
@@ -935,94 +945,95 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Ct
 end
 
 
-# In-place version for point vortices
-function symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source::T,
-	                                             freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
-	Nv = size(source, 1)
-	Nx = 3*Nv
-	Ny = size(target, 1)
-
-	@assert size(J) == (Ny, Nx)
-	@assert size(wtarget) == (Ny,)
-	@assert size(dpd) == (Ny, Nv)
-	@assert size(dpdstar) == (Ny, Nv)
-	@assert size(Css) == (Nv, Nv)
-	@assert size(Cts) == (Ny, Nv)
-
-	fill!(J, 0.0)# Construct the Cauchy matrix to store 1/(zJ-zK) in Css
-	@inbounds for K=1:Nv
-		zK = src[K].z
-		# exploit anti-symmetry of the velocity kernel
-		# Diagonal entries are equal to 0
-		for J=K+1:Nv
-			zJ = src[J].z
-			tmp = abs2(zJ - zK) + δ^2
-			Css[J,K] = conj(zJ - zK)/tmp
-			Css[K,J] = -Css[J,K]
-			∂Css[J,K] = -(δ/tmp)^2
-			∂Css[K,J] =  ∂Css[J,K]
-		end
-	end
-
-	# Construct the Cauchy matrix to store (z̄-z̄J)/(|z-zJ|^2 + δ^2) and the total induced velocity in Cts and wtarget
-	@inbounds for J=1:Nv
-		zJ = src[J].z
-		SJ = -im*src[J].S
-		for i=1:Ny
-			zi = target[i]
-			tmp = abs2(zi - zJ) + δ^2
-			Cts[i,J] = inv(zi - zJ)
-			Ctsblob[i,J] = conj(zi - zJ)/tmp
-			∂Ctsblob[i,J] = -(δ/tmp)^2
-			wtarget[i] += cst*SJ*Ctsblob[i,J]
-		end
-	end
-	fill!(wtarget, 0.0)
-	fill!(dpd, 0.0*im)
-	fill!(dpdstar, 0.0*im)
-	fill!(Css, 0.0*im)
-	fill!(Cts, 0.0*im)
-
-	cst = inv(2*π)
-
-	src = vcat(source...)
-
-	# Construct the Cauchy matrix to store 1/(zJ-zK) in Css
-
-	@inbounds for K=1:Nv
-		zK = src[K].z
-		# exploit anti-symmetry of the velocity kernel
-		# Diagonal entries are equal to 0
-		for J=K+1:Nv
-			zJ = src[J].z
-			Css[J,K] = inv(zJ - zK)
-			Css[K,J] = -Css[J,K]
-		end
-	end
-
-	# Construct the Cauchy matrix to store (z̄-z̄J)/(|z-zJ|^2 + δ^2) and the total induced velocity in Cts and wtarget
-	@inbounds for J=1:Nv
-		zJ = src[J].z
-		SJ = -im*src[J].S
-		for i=1:Ny
-			zi = target[i]
-			Cts[i,J] = inv(zi - zJ)
-			wtarget[i] += cst*SJ*Cts[i,J]
-		end
-	end
-
-	symmetric_analytical_jacobian_position!(dpd, dpdstar, Css, Cts, wtarget, target, src, freestream, idx, t;
-								  iscauchystored = true)
-
-	# Fill dpdpx and dpdy
-	J[:, 1:3:3*(Nv-1)+1] .= 2*real.(dpd[:,1:Nv])
-	J[:, 2:3:3*(Nv-1)+2] .= -2*imag.(dpd[:,1:Nv])
-
-	symmetric_analytical_jacobian_strength!(dpd, dpdstar, Css, Cts, wtarget, target, src, freestream, idx, t;
-								  iscauchystored = true)
-
-	# Vortices
-	J[:, 3:3:3*(Nv-1)+3] .= 2imag.(dpd[:,1:Nv])
-
-	return J
-end
+# # In-place version for point vortices
+# function symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source::T,
+# 	                                             freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
+# 	Nv = size(source, 1)
+# 	Nx = 3*Nv
+# 	Ny = size(target, 1)
+#
+# 	@assert size(J) == (Ny, Nx)
+# 	@assert size(wtarget) == (Ny,)
+# 	@assert size(dpd) == (Ny, Nv)
+# 	@assert size(dpdstar) == (Ny, Nv)
+# 	@assert size(Css) == (Nv, Nv)
+# 	@assert size(Cts) == (Ny, Nv)
+#
+# 	fill!(J, 0.0)# Construct the Cauchy matrix to store 1/(zJ-zK) in Css
+# 	@inbounds for K=1:Nv
+# 		zK = source[K].z
+# 		# exploit anti-symmetry of the velocity kernel
+# 		# Diagonal entries are equal to 0
+# 		for J=K+1:Nv
+# 			zJ = source[J].z
+# 			tmp = abs2(zJ - zK) + δ^2
+# 			Css[J,K] = conj(zJ - zK)/tmp
+# 			Css[K,J] = -Css[J,K]
+# 			∂Css[J,K] = -(δ/tmp)^2
+# 			∂Css[K,J] =  ∂Css[J,K]
+# 		end
+# 	end
+#
+# 	# Construct the Cauchy matrix to store (z̄-z̄J)/(|z-zJ|^2 + δ^2) and the total induced velocity in Cts and wtarget
+# 	@inbounds for J=1:Nv
+# 		zJ = source[J].z
+# 		SJ = -im*source[J].S
+# 		for i=1:Ny
+# 			zi = target[i]
+# 			tmp = abs2(zi - zJ) + δ^2
+# 			Cts[i,J] = inv(zi - zJ)
+# 			Ctsblob[i,J] = conj(zi - zJ)/tmp
+# 			∂Ctsblob[i,J] = -(δ/tmp)^2
+# 			wtarget[i] += cst*SJ*Ctsblob[i,J]
+# 		end
+# 	end
+# 	fill!(wtarget, 0.0)
+# 	fill!(dpd, 0.0*im)
+# 	fill!(dpdstar, 0.0*im)
+# 	fill!(Css, 0.0*im)
+# 	fill!(Cts, 0.0*im)
+#
+# 	cst = inv(2*π)
+#
+# 	src = vcat(source...)
+#
+# 	# Construct the Cauchy matrix to store 1/(zJ-zK) in Css
+#
+# 	@inbounds for K=1:Nv
+# 		zK = source[K].z
+# 		# exploit anti-symmetry of the velocity kernel
+# 		# Diagonal entries are equal to 0
+# 		for J=K+1:Nv
+# 			zJ = source[J].z
+# 			Css[J,K] = inv(zJ - zK)
+# 			Css[K,J] = -Css[J,K]
+# 		end
+# 	end
+#
+# 	# Construct the Cauchy matrix to store (z̄-z̄J)/(|z-zJ|^2 + δ^2) and the total induced velocity in Cts and wtarget
+# 	@inbounds for J=1:Nv
+# 		zJ = source[J].z
+# 		SJ = -im*source[J].S
+# 		for i=1:Ny
+# 			zi = target[i]
+# 			Cts[i,J] = inv(zi - zJ)
+# 			wtarget[i] += cst*SJ*Cts[i,J]
+# 		end
+# 	end
+# 	wtarget .+= real(conj(U))
+#
+# 	symmetric_analytical_jacobian_position!(dpd, dpdstar, Css, Cts, wtarget, target, source, freestream, idx, t;
+# 								  iscauchystored = true)
+#
+# 	# Fill dpdpx and dpdy
+# 	J[:, 1:3:3*(Nv-1)+1] .= 2*real.(dpd[:,1:Nv])
+# 	J[:, 2:3:3*(Nv-1)+2] .= -2*imag.(dpd[:,1:Nv])
+#
+# 	symmetric_analytical_jacobian_strength!(dpd, dpdstar, Css, Cts, wtarget, target, source, freestream, idx, t;
+# 								  iscauchystored = true)
+#
+# 	# Vortices
+# 	J[:, 3:3:3*(Nv-1)+3] .= 2imag.(dpd[:,1:Nv])
+#
+# 	return J
+# end
