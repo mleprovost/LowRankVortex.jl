@@ -3,8 +3,6 @@ module LowRankVortex
 using Interpolations
 using JLD
 using LinearAlgebra
-using LoopVectorization
-using LowRankApprox
 using PotentialFlow
 import PotentialFlow.Motions: reset_velocity!
 import PotentialFlow.Points
