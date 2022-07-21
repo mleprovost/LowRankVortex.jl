@@ -1,7 +1,24 @@
-export symmetric_vortexassim
+export senkf_symmetric_vortexassim
 
-# Create a function to perform the sequential assimilation for any sequential filter SeqFilter
-function symmetric_vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData; withfreestream::Bool = false, P::Parallel = serial) where {S<:Real}
+
+"""
+This routine sequentially assimilates pressure observations collected along the x-axis at locations `config.ss` into the ensemble matrix `X`.
+In this version, the no-flow through is enforced along the x axis, by using the method of images.
+We augment the collection of `config.Nv` vortices with another set of `config.Nv` vortices at the conjugate positions with opposite circulation.
+The assimilation is performed with the stochastic ensemble Kalman filter (sEnKF), see
+Asch, Bocquet, and Nodet, "Data assimilation: methods, algorithms, and applications", Society for Industrial and Applied Mathematics, 2016.
+The user should provide the following arguments:
+- `algo::StochEnKF`: A variable with the parameters of the sEnKF
+- `X::Matrix{Float64}`: `X` is an ensemble matrix whose columns hold the `Ne` samples of the joint distribution π_{h(X),X}.
+   For each column, the first Ny rows store the observation sample h(x^i), and the remaining rows (row Ny+1 to row Ny+Nx) store the state sample x^i.
+- `tspan::Tuple{S,S} where S <: Real`: a tuple that holds the start and final time of the simulation
+- `config::VortexConfig`: A configuration file for the vortex simulation
+- `data::SyntheticData`: A structure that holds the history of the state and observation variables
+Optional arguments:
+- `withfreestream::Bool`: equals `true` if a freestream is applied
+- `P::Parallel = serial`: Determine whether some steps of the routine can be runned in parallel.
+"""
+function senkf_symmetric_vortexassim(algo::StochEnKF, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData; withfreestream::Bool = false, P::Parallel = serial) where {S<:Real}
 
 	# Define the inflation parameters
 	ϵX = config.ϵX

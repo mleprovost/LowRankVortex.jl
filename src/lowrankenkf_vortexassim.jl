@@ -1,12 +1,77 @@
-export symmetric_lowrankvortexassim
+export LREnKF, lowrankenkf_vortexassim
+
+"""
+A structure for the low-rank ensemble Kalman filter (LREnKF)
+
+References:
+Le Provost, Baptista, Marzouk, and Eldredge, "A low-rank ensemble Kalman filter for elliptic observations", arXiv preprint, 2203.05120, 2022.
+
+## Fields
+- `G::Function`: "Filter function"
+- `ϵy::AdditiveInflation`: "Standard deviations of the measurement noise distribution"
+- `Δtdyn::Float64`: "Time step dynamic"
+- `Δtobs::Float64`: "Time step observation"
+- `isfiltered::Bool`: "Boolean: is state vector filtered"
+"""
+
+struct LREnKF<:SeqFilter
+    "Filter function"
+    G::Function
+
+    "Standard deviations of the measurement noise distribution"
+    ϵy::AdditiveInflation
+
+    "Time step dynamic"
+    Δtdyn::Float64
+
+    "Time step observation"
+    Δtobs::Float64
+
+    "Boolean: is state vector filtered"
+    isfiltered::Bool
+end
+
+function LREnKF(G::Function, ϵy::AdditiveInflation,
+    Δtdyn, Δtobs; isfiltered = false)
+    @assert norm(mod(Δtobs, Δtdyn))<1e-12 "Δtobs should be an integer multiple of Δtdyn"
+    return LREnKF(G, ϵy, Δtdyn, Δtobs, isfiltered)
+end
+
+# If no filtering function is provided, use the identity in the constructor.
+function LREnKF(ϵy::AdditiveInflation,
+    Δtdyn, Δtobs, Δtshuff; islocal = false)
+    @assert norm(mod(Δtobs, Δtdyn))<1e-12 "Δtobs should be an integer multiple of Δtdyn"
+
+    return LREnKF(x-> x, ϵy, Δtdyn, Δtobs, false)
+end
 
 
-# Create a function to perform the sequential assimilation for any sequential filter SeqFilter
-function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData;
-	                        withfreestream::Bool=false, rxdefault::Int64 = 100, rydefault::Int64 = 100,
-							israndomized::Bool=false, P::Parallel = serial) where {S<:Real}
+function Base.show(io::IO, lrenkf::LREnKF)
+	println(io,"LREnKF  with filtered = $(lrenkf.isfiltered)")
+end
 
-	# Define the additive Inflation
+"""
+This routine sequentially assimilates pressure observations collected at locations `config.ss` into the ensemble matrix `X`.
+The assimilation is performed with the fixed ranks version of the low-rank ensemble Kalman filter (LREnKF) introduced in
+Le Provost et al. "A low-rank ensemble Kalman filter for elliptic observations" (arXiv:2203.05120), 2022.
+The user should provide the following arguments:
+- `algo::LREnKF`: A variable with the parameters of the LREnKF
+- `X::Matrix{Float64}`: `X` is an ensemble matrix whose columns hold the `Ne` samples of the joint distribution π_{h(X),X}.
+   For each column, the first Ny rows store the observation sample h(x^i), and the remaining rows (row Ny+1 to row Ny+Nx) store the state sample x^i.
+- `tspan::Tuple{S,S} where S <: Real`: a tuple that holds the start and final time of the simulation
+- `config::VortexConfig`: A configuration file for the vortex simulation
+- `data::SyntheticData`: A structure that holds the history of the state and observation variables
+Optional arguments:
+- `withfreestream::Bool`: equals `true` if a freestream is applied
+- `rxdefault::Union{Nothing, Int64} = 100`: the truncated dimension of the informative subspace of the state space
+- `rydefault::Union{Nothing, Int64} = 100`: the truncated dimension of the informative subspace of the observations space
+- `P::Parallel = serial`: Determine whether some steps of the routine can be runned in parallel.
+"""
+function lowrankenkf_vortexassim(algo::LREnKF, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData;
+	                        withfreestream::Bool = false,
+							rxdefault::Int64 = 100, rydefault::Int64 = 100, P::Parallel = serial) where {S<:Real}
+
+	# Define the inflation parameters
 	ϵX = config.ϵX
 	ϵΓ = config.ϵΓ
 	β = config.β
@@ -15,7 +80,6 @@ function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, con
 	ϵmul = MultiplicativeInflation(β)
 
 	Ny = size(config.ss,1)
-
 
 	# Set the time step between two assimilation steps
 	Δtobs = algo.Δtobs
@@ -31,31 +95,16 @@ function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, con
 	# Array dimensions
 	Nypx, Ne = size(X)
 	Nx = Nypx - Ny
-	Nv = config.Nv
 	ystar = zeros(Ny)
 
 	# Cache variable for the velocities
 	cachevels = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
 	# Define the observation operator
-	h(x, t) = measure_state_symmetric(x, t, config; withfreestream = withfreestream)
+	h(x, t) = measure_state(x, t, config; withfreestream = true)
 	# Define an interpolation function in time and space of the true pressure field
 	press_itp = CubicSplineInterpolation((LinRange(real(config.ss[1]), real(config.ss[end]), length(config.ss)),
-	                                   t0:data.Δt:tf), data.yt, extrapolation_bc =  Line())
-
-	# Pre-allocate arrays for the sensitivity analysis
-	Jac = zeros(Ny, 6*Nv)
-	wtarget = zeros(ComplexF64, Ny)
-
-	dpd = zeros(ComplexF64, Ny, 2*Nv)
-	dpdstar = zeros(ComplexF64, Ny, 2*Nv)
-
-	Css = zeros(ComplexF64, 2*Nv, 2*Nv)
-	Cts = zeros(ComplexF64, Ny, 2*Nv)
-
-	∂Css = zeros(2*Nv, 2*Nv)
-	Ctsblob = zeros(ComplexF64, Ny, 2*Nv)
-	∂Ctsblob = zeros(Ny, 2*Nv)
+	                                   t0:config.Δt:tf), data.yt, extrapolation_bc =  Line())
 
 	yt(t) = press_itp(real.(config.ss), t)
 	Xf = Array{Float64,2}[]
@@ -70,7 +119,7 @@ function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, con
 		# Forecast step
 		@inbounds for j=1:step
 			tj = t0+(i-1)*Δtobs+(j-1)*Δtdyn
-			X, _ = symmetric_vortex(X, tj, Ny, Nx, cachevels, config; withfreestream = withfreestream)
+			X, _ = vortex(X, tj, Ny, Nx, cachevels, config; withfreestream = true)
 		end
 
 		push!(Xf, deepcopy(state(X, Ny, Nx)))
@@ -86,7 +135,7 @@ function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, con
 		if algo.isfiltered == true
 			@inbounds for i=1:Ne
 				x = view(X, Ny+1:Ny+Nx, i)
-				x .= filter_state!(x, config)
+				# x .= filter_state!(x, config)
 			end
 		end
 
@@ -100,32 +149,21 @@ function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, con
 		Cx = zeros(Nx, Nx)
 		Cy  = zeros(Ny, Ny)
 
-		# Compute marginally the standard deviation of the state ensemble
+
 		Dx = Diagonal(std(X[Ny+1:Ny+Nx, :]; dims = 2)[:,1])
 		Dϵ = config.ϵY*I
 
 		# Compute the state and observation Gramians. The Jacobian of the pressure field is computed
-		# analytically by exploiting the symmetry of the problem about the x-axis
+		# analytically.
 		@inbounds Threads.@threads for j=1:Ne
-			# @time Jac_AD = AD_symmetric_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), t0+i*Δtobs)
-			# Jac = analytical_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
-			# analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
-			#                               config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
-			if withfreestream == false
-			    symmetric_analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
-				                              config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), 1:config.Nv, t0+i*Δtobs)
-			else
-				symmetric_analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
-				                              config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream,
-											  1:config.Nv, t0+i*Δtobs)
-			end
-
-			Jacj = view(Jac,:,1:3*config.Nv)
-			Cx .+= 1/(Ne-1)*(inv(Dϵ)*Jacj*Dx)'*(inv(Dϵ)*Jacj*Dx)
-			Cy .+= 1/(Ne-1)*(inv(Dϵ)*Jacj*Dx)*(inv(Dϵ)*Jacj*Dx)'
+			# J_AD = AD_symmetric_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), t0+i*Δtobs)
+			J = analytical_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, t0+i*Δtobs)
+			Jj = J[:,1:3*config.Nv]
+			Cx .+= 1/(Ne-1)*(inv(Dϵ)*Jj*Dx)'*(inv(Dϵ)*Jj*Dx)
+			Cy .+= 1/(Ne-1)*(inv(Dϵ)*Jj*Dx)*(inv(Dϵ)*Jj*Dx)'
 		end
 
-		# Set the ranks of the informative subspaces in the observation and state spaces
+
 		ry = min(Ny, rydefault)
 		rx = min(Nx, rxdefault)
 
@@ -165,12 +203,12 @@ function symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, con
 		if algo.isfiltered == true
 			@inbounds for i=1:Ne
 				x = view(X, Ny+1:Ny+Nx, i)
-				x .= filter_state!(x, config)
+				# x .= filter_state!(x, config)
 			end
 		end
 
 		push!(Xa, deepcopy(state(X, Ny, Nx)))
-		end
+	end
 
 	return Xf, Xa
 end
