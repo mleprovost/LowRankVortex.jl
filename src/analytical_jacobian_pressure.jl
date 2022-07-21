@@ -1,10 +1,14 @@
-export analytical_jacobian_strength!,
+strengthsexport analytical_jacobian_strength!,
        analytical_jacobian_strength,
        analytical_jacobian_position!,
        analytical_jacobian_position,
        analytical_jacobian_pressure
 
 
+"""
+In-place routine that returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the strengths and conjugate strengths of the singularities.
+Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to S = Q-iΓ.
+"""
 function analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsblob, wtarget, target::Vector{ComplexF64}, source::T, freestream,
 	                                   idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t;
 	                                   iscauchystored::Bool = false, issourcefixed::Bool = false) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
@@ -106,7 +110,7 @@ end
 
 
 """
-Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the strength and conjugate strength of the singularities.
+Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the strengths and conjugate strengths of the singularities.
 Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to S = Q-iΓ.
 """
 function analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, wtarget, target::Vector{ComplexF64}, source::T, freestream,
@@ -201,6 +205,11 @@ analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsblob, wtarget, target
 analytical_jacobian_strength!(dpdS, dpdSstar, Css, Cts, Ctsblob, wtarget, target, source, freestream, 1:length(source), t;
 							  iscauchystored = iscauchystored)
 
+
+"""
+Routine that returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the strengths and conjugate strengths of the points or blobs.
+Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to S = Q-iΓ.
+"""
 function analytical_jacobian_strength(target::Vector{ComplexF64}, source, freestream,
 	                                  idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t;
                                       iscauchystored::Bool = false)
@@ -231,7 +240,7 @@ analytical_jacobian_strength(target, source, freestream, 1:length(source), t;
 
 # Version for point singularities
 """
-Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the position and conjugate position of the singularities.
+Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the positions and conjugate positions of the singularities.
 Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
 """
 function analytical_jacobian_position!(dpdz, dpdzstar, Css, Cts, wtarget, target::Vector{ComplexF64}, source::T, freestream,
@@ -326,7 +335,7 @@ end
 
 # Version for regularized point singularities (aka blobs)
 """
-Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the position and conjugate position of the singularities.
+Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the positions and conjugate positions of the blobs.
 Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
 """
 function analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Cts, Ctsblob, ∂Ctsblob, wtarget, target::Vector{ComplexF64}, source::T, freestream,
@@ -443,6 +452,10 @@ analytical_jacobian_position!(dpdz, dpdzstar, Css, Cts, wtarget, target, source,
                                       iscauchystored = iscauchystored)
 
 
+"""
+Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the positions and conjugate positions of the singularities/blobs.
+Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
+"""
 function analytical_jacobian_position(target::Vector{ComplexF64}, source, freestream,
 									  idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t;
                                       iscauchystored::Bool = false)
@@ -477,7 +490,12 @@ analytical_jacobian_position(target, source, freestream, 1:length(source), t;
 
 analytical_jacobian_pressure(target, source, freestream, t) = analytical_jacobian_pressure(target, source, freestream, 1:length(source), t)
 
-# Version with allocations for point vortices
+
+"""
+Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to
+the positions, conjugate positions, strengths and conjugate strengths  of the singularities.
+Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
+"""
 function analytical_jacobian_pressure(target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 	Nv = size(source, 1)
 	Nx = 3*Nv
@@ -498,7 +516,11 @@ function analytical_jacobian_pressure(target, source::T, freestream, idx::Union{
 end
 
 
-# Version with allocations for regularized vortices
+"""
+Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to
+the positions, conjugate positions, strengths and conjugate strengths  of the blobs.
+Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
+"""
 function analytical_jacobian_pressure(target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Nv = size(source, 1)
 	Nx = 3*Nv

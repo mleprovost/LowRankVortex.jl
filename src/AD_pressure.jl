@@ -1,6 +1,8 @@
 export AD_symmetric_jacobian_pressure
 
-# The calculation of the pressure Jacobian is made with the symmetry embedded
+
+"This routine commputes the Jacobian of the pressure field by automatic differentiation.
+For improved performance, the symmetry of the point vortices with the x-axis is embedded in the calculation"
 function AD_symmetric_jacobian_pressure(target, source, t)
 
 	Nv = length(source)

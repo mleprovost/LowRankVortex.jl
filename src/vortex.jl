@@ -4,7 +4,7 @@ export VortexConfig, state_to_lagrange, lagrange_to_state
 """
     VortexConfig
 
-An immutable structure representing a corner (`N=1`)/wedge (`N=2`)
+A structure to hold the parameters of the
 
 ## Fields
 - `Nv::Int64`: number of vortices
@@ -50,6 +50,8 @@ struct VortexConfig
     ϵY::Float64
 end
 
+"A routine to convert the state from a vector representation (State representation) to a set of vortex blobs (Lagrangian representation).
+ Use lagrange_to_state for the inverse transformation."
 function state_to_lagrange(state::AbstractVector{Float64}, config::VortexConfig; isblob::Bool=true)
     Nv = config.Nv
 
@@ -71,6 +73,8 @@ function state_to_lagrange(state::AbstractVector{Float64}, config::VortexConfig;
     end
 end
 
+"A routine to convert a set of vortex blobs (Lagrangian representation) to a vector representation (State representation).
+ Use state_to_lagrange for the inverse transformation."
 function lagrange_to_state(source, config::VortexConfig)
     Nv = length(source[1])
 

@@ -114,6 +114,9 @@ function vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig
 
 	   ϵ = algo.ϵy.σ*randn(Ny, Ne) .+ algo.ϵy.m
 
+	   # The implementation of the stochastic EnKF follows
+	   ""
+	   # Compute the anomaly matrices
 	   Xpert = (1/sqrt(Ne-1))*(X[Ny+1:Ny+Nx,:] .- mean(X[Ny+1:Ny+Nx,:]; dims = 2)[:,1])
 	   HXpert = (1/sqrt(Ne-1))*(X[1:Ny,:] .- mean(X[1:Ny,:]; dims = 2)[:,1])
 	   ϵpert = (1/sqrt(Ne-1))*(ϵ .- mean(ϵ; dims = 2)[:,1])

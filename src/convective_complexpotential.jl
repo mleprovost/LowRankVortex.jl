@@ -2,6 +2,9 @@ export convective_complexpotential
 
 import PotentialFlow.Properties: @property
 
+# These routines compute the time rate of change of the complex potential of a moving point vortex or regularized point vortex
+# For a point vortex with strength Γ located at z_J,
+# i.e. dF(z)/dt = 1/(z - z_J) (-ż_J) where ż_J denotes the velocity of the point vortex.
 @property begin
     signature = convective_complexpotential(targ::Target, src::Source, srcvel::Source)
     preallocator = allocate_convective_complexpotential

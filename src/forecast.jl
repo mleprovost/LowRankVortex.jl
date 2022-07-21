@@ -5,6 +5,7 @@ import TransportBasedInference: Parallel, Serial, Thread
 
 vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool = false) = vortex(X, t, Ny, Nx, cachevels, config, serial, withfreestream = withfreestream)
 
+"This routine advects the point vortices of the different ensemble members stored in X by a time step config.Δt"
 function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestream::Bool=false)
 	Nypx, Ne = size(X)
 	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
@@ -32,6 +33,9 @@ function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestr
 	return X, t + config.Δt
 end
 
+"This routine advects the point vortices of the different ensemble members stored in X by a time step config.Δt.
+ Note that this version assumes that for each vortex with strength Γ_J located at z_J,
+ there is a mirror point vortex with strength -Γ_J located at conj(z_J)."
 symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool=false) = symmetric_vortex(X, t, Ny, Nx, cachevels, config, serial; withfreestream = withfreestream)
 
 function symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestream::Bool=false)

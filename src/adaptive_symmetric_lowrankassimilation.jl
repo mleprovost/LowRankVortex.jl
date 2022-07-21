@@ -65,8 +65,9 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 	Xa = Array{Float64,2}[]
 	push!(Xa, copy(state(X, Ny, Nx)))
 
-	# Run particle filter
+	# Run the ensemble filter
 	for i=1:length(Acycle)
+
 		# Forecast step
 		@inbounds for j=1:step
 			tj = t0+(i-1)*Δtobs+(j-1)*Δtdyn
@@ -75,7 +76,7 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 
 		push!(Xf, deepcopy(state(X, Ny, Nx)))
 
-		# Get real measurement
+		# Get the true observation ystar
 		ystar .= yt(t0+i*Δtobs)
 
 		# Perform state inflation
@@ -90,6 +91,7 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 			end
 		end
 
+		# Evaluate the observation operator for the different ensemble members
 		observe(h, X, t0+i*Δtobs, Ny, Nx; P = P)
 
 		ϵ = algo.ϵy.σ*randn(Ny, Ne) .+ algo.ϵy.m
@@ -105,6 +107,7 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 		Dϵ = config.ϵY*I
 		# Dϵ = I
 
+		# Compute the state and observation Gramians
 		@inbounds Threads.@threads for j=1:Ne
 			# @time Jac_AD = AD_symmetric_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), t0+i*Δtobs)
 			# Jac = analytical_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
@@ -117,9 +120,6 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 				symmetric_analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
 											  config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
 			end
-
-			# @show Jac_AD[1:3,1:3]
-			# @show Jac[1:3,1:3]
 
 			# @show norm(Jac_AD[:,1:3*config.Nv]-Jac[:,1:3*config.Nv])
 			Jacj = view(Jac,:,1:3*config.Nv)
@@ -134,11 +134,13 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 			rx = min(Nx, rxdefault)
 		end
 
+		# Compute the eigenspectrum of Cx
+		V, Λx, _ = svd(Symmetric(Cx))
 		# Lbx, V = pheig(Symmetric(Cx), rank = rx)
 		# V = reverse(V, dims = 2)
 		# Λx, V = eigen(Symmetric(Cx); sortby = λ -> -λ)
-		V, Λx, _ = svd(Symmetric(Cx))
 
+		# Determine the rank rx to capture at least ratio of the cumulative energy
 		if isadaptive == true
 			tmpx = findfirst(x-> x >= ratio, cumsum(Λx)./sum(Λx))
 			if typeof(tmpx) <: Nothing
@@ -149,14 +151,17 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 			push!(rxhist, copy(rx))
 		end
 
+		# Extract the first rx eigenvectors of Cx
 		V = V[:,1:rx]
 		# @show norm(V*V'-I), norm(V'*V-I)
 
+		# Compute the eigenspectrum of Cx
+		U, Λy, _ = svd(Symmetric(Cy))
 		# Lby, U = pheig(Symmetric(Cy), rank = ry)
 		# U = reverse(U, dims = 2)
 		# Λy, U = eigen(Symmetric(Cy); sortby = λ -> -λ)
-		U, Λy, _ = svd(Symmetric(Cy))
 
+		# Determine the rank rx to capture at least ratio of the cumulative energy
 		if isadaptive == true
 			tmpy = findfirst(x-> x >= ratio, cumsum(Λy)./sum(Λy))
 			if typeof(tmpy) <: Nothing
@@ -167,6 +172,7 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 			push!(ryhist, copy(ry))
 		end
 
+		# Extract the first ry eigenvectors of Cy
 		U = U[:,1:ry]
 		# U = I
 
@@ -181,6 +187,9 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 
 		"Low-rank analysis step with representers, Evensen, Leeuwen et al. 1998"
 
+		b̆ = (HXbrevepert*HXbrevepert' + ϵbrevepert*ϵbrevepert')\(U'*(Dϵ\(ystar .- (X[1:Ny,:] + ϵ))))
+		view(X,Ny+1:Ny+Nx,:) .+= Dx*V*(Xbrevepert*HXbrevepert')*b̆
+
 		# K̆ = Xbrevepert*HXbrevepert'*inv(HXbrevepert*HXbrevepert' + ϵbrevepert*ϵbrevepert')
 		# Kcxcy =  Dx*V*K̆*U'*inv(Dϵ)
 		# Xpert = (1/sqrt(Ne-1))*(X[Ny+1:Ny+Nx,:] .- mean(X[Ny+1:Ny+Nx,:]; dims = 2)[:,1])
@@ -191,11 +200,6 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 		# @show norm(Kcxcy - Kenkf), norm(Kcxcy - Kenkf)/norm(Kenkf)
 		# @show cumsum(svd(Kenkf).S) ./ sum(svd(Kenkf).S)
 		# @show norm(K̆ - K̆enkf), norm(K̆ - K̆enkf)/norm(K̆enkf)
-
-		b̆ = (HXbrevepert*HXbrevepert' + ϵbrevepert*ϵbrevepert')\(U'*(Dϵ\(ystar .- (X[1:Ny,:] + ϵ))))
-		view(X,Ny+1:Ny+Nx,:) .+= Dx*V*(Xbrevepert*HXbrevepert')*b̆
-
-		# X = algo(X, ystar, t0+i*Δtobs)
 
 		# Filter state
 		if algo.isfiltered == true

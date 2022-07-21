@@ -1,5 +1,6 @@
 export color_palette
 
+"Defines a palette of colors for plotting"
 const color_palette = [colorant"firebrick";
                 colorant"orangered2";
                     colorant"goldenrod1";
