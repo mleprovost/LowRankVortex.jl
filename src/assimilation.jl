@@ -5,7 +5,10 @@ struct RecipeInflation <: InflationType
     p::Array{Float64,1}
 end
 
-# Filtering function to bound the strength of the vortices and sources
+"""
+A filter function to ensure that the point vortices stay above the x-axis, and retain a positive circulation.
+This function would typically be used before and after the analysis step to enforce those constraints.
+"""
 function filter_state!(x, config::VortexConfig)
 	@inbounds for j=1:config.Nv
 		# Ensure that vortices stay above the x axis
@@ -18,6 +21,11 @@ end
 
 # This function apply additive inflation to the state components only,
 # not the measurements, X is an Array{Float64,2} or a view of it
+"""
+Applies the additive inflation `ϵX`, `ϵΓ` to the positions, strengths of the point vortices, respectively.
+The rows Ny+1 to Ny+Nx of `X` contain the state representation for the different ensemble members.
+`X` contains Ne columns (one per each ensemble member) of Ny+Nx lines. The associated observations are stored in the first Ny rows.
+"""
 function (ϵ::RecipeInflation)(X, Ny, Nx, config::VortexConfig)
 	ϵX, ϵΓ = ϵ.p
 	Nv = config.Nv
@@ -32,6 +40,10 @@ function (ϵ::RecipeInflation)(X, Ny, Nx, config::VortexConfig)
 	end
 end
 
+"""
+Applies the additive inflation `ϵX`, `ϵΓ` to the positions, strengths of the point vortices, respectively.
+The vector `x` contains the state representation of the collection of point vortices.
+"""
 function (ϵ::RecipeInflation)(x::AbstractVector{Float64}, config::VortexConfig)
 	ϵX, ϵΓ = ϵ.p
 	Nv = config.Nv
@@ -47,18 +59,19 @@ end
 # Create a function to perform the sequential assimilation for any sequential filter SeqFilter
 function vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData; withfreestream::Bool = false, P::Parallel = serial) where {S<:Real}
 
-	# Define the additive Inflation
+	# Define the inflation parameters
 	ϵX = config.ϵX
 	ϵΓ = config.ϵΓ
 	β = config.β
 	ϵY = config.ϵY
+	ϵx = RecipeInflation([ϵX; ϵΓ])
+	ϵmul = MultiplicativeInflation(β)
 
 	Ny = size(config.ss,1)
 
-	ϵx = RecipeInflation([ϵX; ϵΓ])
-	ϵmul = MultiplicativeInflation(β)
-	# Set different times
+	# Set the time step between two assimilation steps
 	Δtobs = algo.Δtobs
+	# Set the time step for the time marching of the dynamical system
 	Δtdyn = algo.Δtdyn
 	t0, tf = tspan
 	step = ceil(Int, Δtobs/Δtdyn)
@@ -72,9 +85,12 @@ function vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig
 	Nx = Nypx - Ny
 	ystar = zeros(Ny)
 
+	# Cache variable for the velocities
 	cachevels = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
+	# Define the observation operator
 	h(x, t) = measure_state(x, t, config; withfreestream = withfreestream)
+	# Define an interpolation function in time and space of the true pressure field
 	press_itp = CubicSplineInterpolation((LinRange(real(config.ss[1]), real(config.ss[end]), length(config.ss)),
 	                                   t0:data.Δt:tf), data.yt, extrapolation_bc =  Line())
 
@@ -85,17 +101,18 @@ function vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig
 	Xa = Array{Float64,2}[]
 	push!(Xa, copy(state(X, Ny, Nx)))
 
-	# Run particle filter
+	# Run the ensemble filter
 	@showprogress for i=1:length(Acycle)
-	   # Forecast step
-	   @inbounds for j=1:step
+
+		# Forecast step
+		@inbounds for j=1:step
 		   tj = t0+(i-1)*Δtobs+(j-1)*Δtdyn
 		   X, _ = vortex(X, tj, Ny, Nx, cachevels, config, withfreestream = withfreestream)
-	   end
+		end
 
 	   push!(Xf, deepcopy(state(X, Ny, Nx)))
 
-	   # Get real measurement
+	   # Get the true observation ystar
 	   ystar .= yt(t0+i*Δtobs)
 
 	   # Perform state inflation
@@ -110,24 +127,29 @@ function vortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig
 		   end
 	   end
 
+	   # Evaluate the observation operator for the different ensemble members
 	   observe(h, X, t0+i*Δtobs, Ny, Nx; P = P)
 
+	   # Generate samples from the observation noise
 	   ϵ = algo.ϵy.σ*randn(Ny, Ne) .+ algo.ϵy.m
 
 	   # The implementation of the stochastic EnKF follows
-	   ""
-	   # Compute the anomaly matrices
+	   # Form the perturbation matrix for the state
 	   Xpert = (1/sqrt(Ne-1))*(X[Ny+1:Ny+Nx,:] .- mean(X[Ny+1:Ny+Nx,:]; dims = 2)[:,1])
+	   # Form the perturbation matrix for the observation
 	   HXpert = (1/sqrt(Ne-1))*(X[1:Ny,:] .- mean(X[1:Ny,:]; dims = 2)[:,1])
+	   # Form the perturbation matrix for the observation noise
 	   ϵpert = (1/sqrt(Ne-1))*(ϵ .- mean(ϵ; dims = 2)[:,1])
 	   # Kenkf = Xpert*HXpert'*inv(HXpert*HXpert'+ϵpert*ϵpert')
 
+	   # Apply the Kalman gain based on the representers
+	   # Burgers G, Jan van Leeuwen P, Evensen G. 1998 Analysis scheme in the ensemble Kalman
+	   # filter. Monthly weather review 126, 1719–1724. Solve the linear system for b ∈ R^{Ny × Ne}:
 	   b = (HXpert*HXpert' + ϵpert*ϵpert')\(ystar .- (X[1:Ny,:] + ϵ))
+
+	   # Update the ensemble members according to:
+	   # x^{a,i} = x^i - Σ_{X,Y}b^i, with b^i =  Σ_Y^{-1}(h(x^i) + ϵ^i - ystar)
 	   view(X,Ny+1:Ny+Nx,:) .+= (Xpert*HXpert')*b
-
-	   # @show cumsum(svd((Xpert*HXpert')*inv((HXpert*HXpert' + ϵpert*ϵpert'))).S)./sum(svd((Xpert*HXpert')*inv((HXpert*HXpert' + ϵpert*ϵpert'))).S)
-
-	   # X = algo(X, ystar, t0+i*Δtobs)
 
 	   # Filter state
 	   if algo.isfiltered == true

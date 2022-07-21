@@ -1,23 +1,24 @@
-export adaptive_symmetric_lowrankvortexassim
+export adaptive_symmetric_lowrankenkfvortex
 
 
 # Create a function to perform the sequential assimilation for any sequential filter SeqFilter
-function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData;
+function adaptive_symmetric_lowrankenkfvortex(algo::SeqFilter, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData;
 	                        withfreestream::Bool = false, rxdefault::Union{Nothing, Int64} = 100, rydefault::Union{Nothing, Int64} = 100,
 							isadaptive::Bool=false, ratio::Float64=0.95, israndomized::Bool=false, P::Parallel = serial) where {S<:Real}
 
-	# Define the additive Inflation
+	# Define the inflation parameters
 	ϵX = config.ϵX
 	ϵΓ = config.ϵΓ
 	β = config.β
 	ϵY = config.ϵY
+	ϵx = RecipeInflation([ϵX; ϵΓ])
+	ϵmul = MultiplicativeInflation(β)
 
 	Ny = size(config.ss,1)
 
-	ϵx = RecipeInflation([ϵX; ϵΓ])
-	ϵmul = MultiplicativeInflation(β)
-	# Set different times
+	# Set the time step between two assimilation steps
 	Δtobs = algo.Δtobs
+	# Set the time step for the time marching of the dynamical system
 	Δtdyn = algo.Δtdyn
 	t0, tf = tspan
 	step = ceil(Int, Δtobs/Δtdyn)
@@ -32,15 +33,16 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 	Nv = config.Nv
 	ystar = zeros(Ny)
 
-	freestream = Freestream(config.U)
-
+	# Cache variable for the velocities
 	cachevels = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
+	# Define the observation operator
 	h(x, t) = measure_state_symmetric(x, t, config; withfreestream =  withfreestream)
+	# Define an interpolation function in time and space of the true pressure field
 	press_itp = CubicSplineInterpolation((LinRange(real(config.ss[1]), real(config.ss[end]), length(config.ss)),
 	                                   t0:data.Δt:tf), data.yt, extrapolation_bc =  Line())
 
-	# Pre-allocate arrays for the sensitivity analysis
+	# Pre allocate arrays for the sensitivity analysis
 	Jac = zeros(Ny, 6*Nv)
 	wtarget = zeros(ComplexF64, Ny)
 
@@ -94,20 +96,19 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 		# Evaluate the observation operator for the different ensemble members
 		observe(h, X, t0+i*Δtobs, Ny, Nx; P = P)
 
+		# Generate samples from the observation noise
 		ϵ = algo.ϵy.σ*randn(Ny, Ne) .+ algo.ϵy.m
 
-		# Low-rank basis
+		# Pre-allocate the state and observation Gramians
 		Cx = zeros(Nx, Nx)
 		Cy  = zeros(Ny, Ny)
 
-
+		# Compute marginally the standard deviation of the state ensemble
 		Dx = Diagonal(std(X[Ny+1:Ny+Nx, :]; dims = 2)[:,1])
-		# Dx = I
-		# Dϵ = Diagonal(std(ϵ; dims = 2)[:,1])
 		Dϵ = config.ϵY*I
-		# Dϵ = I
 
-		# Compute the state and observation Gramians
+		# Compute the state and observation Gramians. The Jacobian of the pressure field is computed
+		# analytically by exploiting the symmetry of the problem about the x-axis
 		@inbounds Threads.@threads for j=1:Ne
 			# @time Jac_AD = AD_symmetric_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), t0+i*Δtobs)
 			# Jac = analytical_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
@@ -121,7 +122,6 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 											  config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
 			end
 
-			# @show norm(Jac_AD[:,1:3*config.Nv]-Jac[:,1:3*config.Nv])
 			Jacj = view(Jac,:,1:3*config.Nv)
 			Cx .+= 1/(Ne-1)*(inv(Dϵ)*Jacj*Dx)'*(inv(Dϵ)*Jacj*Dx)
 			Cy .+= 1/(Ne-1)*(inv(Dϵ)*Jacj*Dx)*(inv(Dϵ)*Jacj*Dx)'
@@ -134,13 +134,10 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 			rx = min(Nx, rxdefault)
 		end
 
-		# Compute the eigenspectrum of Cx
+		# Compute the eigenspectrum of Cx. For improved robustness, we use a SVD decomposition
 		V, Λx, _ = svd(Symmetric(Cx))
-		# Lbx, V = pheig(Symmetric(Cx), rank = rx)
-		# V = reverse(V, dims = 2)
-		# Λx, V = eigen(Symmetric(Cx); sortby = λ -> -λ)
 
-		# Determine the rank rx to capture at least ratio of the cumulative energy
+		# Determine the rank rx to capture at least `ratio` of the cumulative energy of Cx
 		if isadaptive == true
 			tmpx = findfirst(x-> x >= ratio, cumsum(Λx)./sum(Λx))
 			if typeof(tmpx) <: Nothing
@@ -151,17 +148,13 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 			push!(rxhist, copy(rx))
 		end
 
-		# Extract the first rx eigenvectors of Cx
+		# Extract the top (i.e. most energetic) rx eigenvectors of Cx
 		V = V[:,1:rx]
-		# @show norm(V*V'-I), norm(V'*V-I)
 
-		# Compute the eigenspectrum of Cx
+		# Compute the eigenspectrum of Cy. For improved robustness, we use a SVD decomposition
 		U, Λy, _ = svd(Symmetric(Cy))
-		# Lby, U = pheig(Symmetric(Cy), rank = ry)
-		# U = reverse(U, dims = 2)
-		# Λy, U = eigen(Symmetric(Cy); sortby = λ -> -λ)
 
-		# Determine the rank rx to capture at least ratio of the cumulative energy
+		# Determine the rank ry to capture at least `ratio` of the cumulative energy of Cy
 		if isadaptive == true
 			tmpy = findfirst(x-> x >= ratio, cumsum(Λy)./sum(Λy))
 			if typeof(tmpy) <: Nothing
@@ -172,22 +165,29 @@ function adaptive_symmetric_lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{
 			push!(ryhist, copy(ry))
 		end
 
-		# Extract the first ry eigenvectors of Cy
+		# Extract the top ry eigenvectors of Cy
 		U = U[:,1:ry]
-		# U = I
 
+		# Whiten and project the prior samples x^i by substracitng the empirical mean and rotating the samples by V^⊤ Σ_x^{-1/2}
 		Xbreve = V'*(inv(Dx)*(X[Ny+1:Ny+Nx,:] .- mean(X[Ny+1:Ny+Nx,:]; dims = 2)[:,1]))
+		# Form the perturbation matrix for the whitened state
 		Xbrevepert = (1/sqrt(Ne-1))*(Xbreve .- mean(Xbreve; dims = 2)[:,1])
 
-		HXbreve = U'*(inv(Dϵ)*(X[1:Ny,:] .- mean(X[1:Ny,:]; dims = 2)[:,1]))
+		# Whiten and project the observation samples h(x^i) by substracitng the empirical mean and rotating the samples by U^⊤ Σ_ϵ^{-1/2}
+		HXbreve = U'*(inv(Dϵ)*(X[1:Ny,:] .- mean(X[1:Ny,:]; dims = 2)[:,1])
+		# Form the perturbation matrix for the whitened observation
 		HXbrevepert = (1/sqrt(Ne-1))*(HXbreve .- mean(HXbreve; dims = 2)[:,1])
 
+		# Whiten and project the observation noise samples ϵ^i by substracitng the empirical mean and rotating the samples by U^⊤ Σ_ϵ^{-1/2}
 		ϵbreve = U'*(inv(Dϵ)*(ϵ .- mean(ϵ; dims =2)[:,1]))
+		# Form the perturbation matrix for the whitened observation noise
 		ϵbrevepert = (1/sqrt(Ne-1))*(ϵbreve .- mean(ϵbreve; dims = 2)[:,1])
 
-		"Low-rank analysis step with representers, Evensen, Leeuwen et al. 1998"
-
+		# Apply the Kalman gain in the projected space based on the representers
+		# Burgers G, Jan van Leeuwen P, Evensen G. 1998 Analysis scheme in the ensemble Kalman
+        # filter. Monthly weather review 126, 1719–1724. Solve the linear system for b̆ ∈ R^{ry × Ne}:
 		b̆ = (HXbrevepert*HXbrevepert' + ϵbrevepert*ϵbrevepert')\(U'*(Dϵ\(ystar .- (X[1:Ny,:] + ϵ))))
+		# Lift result to the original space
 		view(X,Ny+1:Ny+Nx,:) .+= Dx*V*(Xbrevepert*HXbrevepert')*b̆
 
 		# K̆ = Xbrevepert*HXbrevepert'*inv(HXbrevepert*HXbrevepert' + ϵbrevepert*ϵbrevepert')

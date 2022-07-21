@@ -2,6 +2,13 @@
 
 export measure_state_symmetric, symmetric_pressure#, analytical_symmetric_jacobian_strength
 
+"""
+Evaluates the pressure induced at `config.ss` by the regularized point vortices stored in `state`,
+and an optional freestream of amplitude `config.U`.
+The pressure is computed from the unsteady Bernoulli equation.
+Note that this version assumes that the pressure is calculated at locations along the x-axis.
+For each point vortex, there is a mirror point vortex with conjugate position and opposite strength.
+"""
 function measure_state_symmetric(state, t, config::VortexConfig; withfreestream::Bool = false)
 	if withfreestream == false
     	return symmetric_pressure(real(config.ss), state_to_lagrange(state, config)[1], t)
@@ -12,6 +19,11 @@ function measure_state_symmetric(state, t, config::VortexConfig; withfreestream:
 end
 
 # Symmetric pressure calculation for point vortices
+"""
+Evaluates the pressure induced at `target` by the point vortices `source`. The pressure is computed from the unsteady Bernoulli equation.
+Note that this version assumes that the pressure is calculated at locations along the x-axis.
+For each point vortex, there is a mirror point vortex with conjugate position and opposite strength.
+"""
 function symmetric_pressure(target::Vector{Float64}, source::T, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 
     Nv = size(source, 1)
@@ -58,6 +70,12 @@ function symmetric_pressure(target::Vector{Float64}, source::T, t) where T <: Ve
 end
 
 # Symmetric pressure calculation for point vortices with freestream
+"""
+Evaluates the pressure induced at `target` by the point vortices `source` and the freestream `freestream`.
+The pressure is computed from the unsteady Bernoulli equation.
+Note that this version assumes that the pressure is calculated at locations along the x-axis.
+For each point vortex, there is a mirror point vortex with conjugate position and opposite strength.
+"""
 function symmetric_pressure(target::Vector{Float64}, source::T, freestream, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 
     Nv = size(source, 1)
@@ -106,6 +124,12 @@ function symmetric_pressure(target::Vector{Float64}, source::T, freestream, t) w
 end
 
 # Symmetric pressure calculation for regularized vortices
+"""
+Evaluates the pressure induced at `target` by the regularized point vortices `source`.
+The pressure is computed from the unsteady Bernoulli equation.
+Note that this version assumes that the pressure is calculated at locations along the x-axis.
+For each regularized point vortex, there is a mirror regularized point vortex with conjugate position and opposite strength.
+"""
 function symmetric_pressure(target::Vector{Float64}, source::T, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 
 	source = deepcopy(source)
@@ -159,6 +183,12 @@ function symmetric_pressure(target::Vector{Float64}, source::T, t) where T <: Ve
 end
 
 # Symmetric pressure calculation for regularized vortices with freestream
+"""
+Evaluates the pressure induced at `target` by the regularized point vortices `source` and the freestream `freestream`.
+The pressure is computed from the unsteady Bernoulli equation.
+Note that this version assumes that the pressure is calculated at locations along the x-axis.
+For each regularized point vortex, there is a mirror regularized point vortex with conjugate position and opposite strength.
+"""
 function symmetric_pressure(target::Vector{Float64}, source::T, freestream, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 
 	source = deepcopy(source)

@@ -6,18 +6,19 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 	                        withfreestream::Bool = false,
 							rxdefault::Int64 = 100, rydefault::Int64 = 100, israndomized::Bool=false, P::Parallel = serial) where {S<:Real}
 
-	# Define the additive Inflation
+	# Define the inflation parameters
 	ϵX = config.ϵX
 	ϵΓ = config.ϵΓ
 	β = config.β
 	ϵY = config.ϵY
+	ϵx = RecipeInflation([ϵX; ϵΓ])
+	ϵmul = MultiplicativeInflation(β)
 
 	Ny = size(config.ss,1)
 
-	ϵx = RecipeInflation([ϵX; ϵΓ])
-	ϵmul = MultiplicativeInflation(β)
-	# Set different times
+	# Set the time step between two assimilation steps
 	Δtobs = algo.Δtobs
+	# Set the time step for the time marching of the dynamical system
 	Δtdyn = algo.Δtdyn
 	t0, tf = tspan
 	step = ceil(Int, Δtobs/Δtdyn)
@@ -31,11 +32,12 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 	Nx = Nypx - Ny
 	ystar = zeros(Ny)
 
-	freestream = Freestream(0.0*im)
-
+	# Cache variable for the velocities
 	cachevels = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
+	# Define the observation operator
 	h(x, t) = measure_state(x, t, config; withfreestream = true)
+	# Define an interpolation function in time and space of the true pressure field
 	press_itp = CubicSplineInterpolation((LinRange(real(config.ss[1]), real(config.ss[end]), length(config.ss)),
 	                                   t0:config.Δt:tf), data.yt, extrapolation_bc =  Line())
 
@@ -46,8 +48,9 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 	Xa = Array{Float64,2}[]
 	push!(Xa, copy(state(X, Ny, Nx)))
 
-	# Run particle filter
+	# Run the ensemble filter
 	@showprogress for i=1:length(Acycle)
+
 		# Forecast step
 		@inbounds for j=1:step
 			tj = t0+(i-1)*Δtobs+(j-1)*Δtdyn
@@ -56,7 +59,7 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 
 		push!(Xf, deepcopy(state(X, Ny, Nx)))
 
-		# Get real measurement
+		# Get the true observation ystar
 		ystar .= yt(t0+i*Δtobs)
 
 		# Perform state inflation
@@ -71,21 +74,22 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 			end
 		end
 
+		# Evaluate the observation operator for the different ensemble members
 		observe(h, X, t0+i*Δtobs, Ny, Nx; P = P)
 
+		# Generate samples from the observation noise
 		ϵ = algo.ϵy.σ*randn(Ny, Ne) .+ algo.ϵy.m
 
-		# Low-rank basis
+		# Pre-allocate the state and observation Gramians
 		Cx = zeros(Nx, Nx)
 		Cy  = zeros(Ny, Ny)
 
 
 		Dx = Diagonal(std(X[Ny+1:Ny+Nx, :]; dims = 2)[:,1])
-		# Dx = I
-		# Dϵ = Diagonal(std(ϵ; dims = 2)[:,1])
 		Dϵ = config.ϵY*I
-		# Dϵ = I
 
+		# Compute the state and observation Gramians. The Jacobian of the pressure field is computed
+		# analytically.
 		@inbounds Threads.@threads for j=1:Ne
 			# J_AD = AD_symmetric_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), t0+i*Δtobs)
 			J = analytical_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, t0+i*Δtobs)
@@ -98,47 +102,38 @@ function lowrankvortexassim(algo::SeqFilter, X, tspan::Tuple{S,S}, config::Vorte
 		ry = min(Ny, rydefault)
 		rx = min(Nx, rxdefault)
 
-		# Lbx, V = pheig(Symmetric(Cx), rank = rx)
-		# V = reverse(V, dims = 2)
-		# Λx, V = eigen(Symmetric(Cx); sortby = λ -> -λ)
+		# Compute the eigenspectrum of Cx. For improved robustness, we use a SVD decomposition
 		V, Λx, _ = svd(Symmetric(Cx))
+		# Extract the top (i.e. most energetic) rx eigenvectors of Cx
 		V = V[:,1:rx]
-		# @show norm(V*V'-I), norm(V'*V-I)
 
-		# Lby, U = pheig(Symmetric(Cy), rank = ry)
-		# U = reverse(U, dims = 2)
-		# Λy, U = eigen(Symmetric(Cy); sortby = λ -> -λ)
+		# Compute the eigenspectrum of Cy. For improved robustness, we use a SVD decomposition
 		U, Λy, _ = svd(Symmetric(Cy))
+		# Extract the top ry eigenvectors of Cy
 		U = U[:,1:ry]
-		# U = I
 
+		# Whiten and project the prior samples x^i by substracitng the empirical mean and rotating the samples by V^⊤ Σ_x^{-1/2}
 		Xbreve = V'*(inv(Dx)*(X[Ny+1:Ny+Nx,:] .- mean(X[Ny+1:Ny+Nx,:]; dims = 2)[:,1]))
+		# Form the perturbation matrix for the whitened state
 		Xbrevepert = (1/sqrt(Ne-1))*(Xbreve .- mean(Xbreve; dims = 2)[:,1])
 
+		# Whiten and project the observation samples h(x^i) by substracitng the empirical mean and rotating the samples by U^⊤ Σ_ϵ^{-1/2}
 		HXbreve = U'*(inv(Dϵ)*(X[1:Ny,:] .- mean(X[1:Ny,:]; dims = 2)[:,1]))
+		# Form the perturbation matrix for the whitened observation
 		HXbrevepert = (1/sqrt(Ne-1))*(HXbreve .- mean(HXbreve; dims = 2)[:,1])
 
+		# Whiten and project the observation noise samples ϵ^i by substracitng the empirical mean and rotating the samples by U^⊤ Σ_ϵ^{-1/2}
 		ϵbreve = U'*(inv(Dϵ)*(ϵ .- mean(ϵ; dims =2)[:,1]))
+		# Form the perturbation matrix for the whitened observation noise
 		ϵbrevepert = (1/sqrt(Ne-1))*(ϵbreve .- mean(ϵbreve; dims = 2)[:,1])
 
-		"Low-rank analysis step with representers, Evensen, Leeuwen et al. 1998"
-
-		# K̆ = Xbrevepert*HXbrevepert'*inv(HXbrevepert*HXbrevepert' + ϵbrevepert*ϵbrevepert')
-		# Kcxcy =  Dx*V*K̆*U'*inv(Dϵ)
-		# Xpert = (1/sqrt(Ne-1))*(X[Ny+1:Ny+Nx,:] .- mean(X[Ny+1:Ny+Nx,:]; dims = 2)[:,1])
-		# HXpert = (1/sqrt(Ne-1))*(X[1:Ny,:] .- mean(X[1:Ny,:]; dims = 2)[:,1])
-		# ϵpert = (1/sqrt(Ne-1))*(ϵ .- mean(ϵ; dims = 2)[:,1])
-		# Kenkf = Xpert*HXpert'*inv(HXpert*HXpert'+ϵpert*ϵpert')
-		# K̆enkf = V'*inv(Dx)*Kenkf*Dϵ*U
-		# @show norm(Kcxcy - Kenkf), norm(Kcxcy - Kenkf)/norm(Kenkf)
-		# @show cumsum(svd(Kenkf).S) ./ sum(svd(Kenkf).S)
-		# @show norm(K̆ - K̆enkf), norm(K̆ - K̆enkf)/norm(K̆enkf)
-
+		# Apply the Kalman gain in the projected space based on the representers
+		# Burgers G, Jan van Leeuwen P, Evensen G. 1998 Analysis scheme in the ensemble Kalman
+		# filter. Monthly weather review 126, 1719–1724. Solve the linear system for b̆ ∈ R^{ry × Ne}:
 		b̆ = (HXbrevepert*HXbrevepert' + ϵbrevepert*ϵbrevepert')\(U'*(Dϵ\(ystar .- (X[1:Ny,:] + ϵ))))
+		# Lift result to the original space
 		view(X,Ny+1:Ny+Nx,:) .+= Dx*V*(Xbrevepert*HXbrevepert')*b̆
-
-		# X = algo(X, ystar, t0+i*Δtobs)
-
+		
 		# Filter state
 		if algo.isfiltered == true
 			@inbounds for i=1:Ne

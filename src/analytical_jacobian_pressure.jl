@@ -1,4 +1,4 @@
-strengthsexport analytical_jacobian_strength!,
+export analytical_jacobian_strength!,
        analytical_jacobian_strength,
        analytical_jacobian_position!,
        analytical_jacobian_position,

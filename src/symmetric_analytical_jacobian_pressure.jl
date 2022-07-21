@@ -128,7 +128,7 @@ end
 
 # Version for regularized point singularities (aka blobs)
 """
-Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the position and conjugate position of the singularities.
+Returns the Jacobian of the pressure computed from the unsteady Bernoulli equation with respect to the position and conjugate position of the regularized singularities.
 Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
 """
 function symmetric_analytical_jacobian_position!(dpdz, dpdzstar, Css, ∂Css, Cts, Ctsblob, ∂Ctsblob, wtarget, target::Vector{Float64}, source::T,

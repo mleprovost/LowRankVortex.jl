@@ -3,6 +3,11 @@ export pressure!, pressure,
        pressure_AD,
        measure_state
 
+"""
+Evaluates the pressure induced at `config.ss` by the regularized point vortices stored in `state`,
+and an optional freestream of amplitude `config.U`.
+The pressure is computed from the unsteady Bernoulli equation.
+"""
 function measure_state(state, t, config::VortexConfig; withfreestream::Bool=false)
     if withfreestream == false
         return pressure(config.ss, state_to_lagrange(state, config), t)
@@ -12,6 +17,10 @@ function measure_state(state, t, config::VortexConfig; withfreestream::Bool=fals
     end
 end
 
+"""
+Evaluates in-place the pressure induced at `target` by the point vortices `source`.
+The pressure is computed from the unsteady Bernoulli equation.
+"""
 function pressure!(press, targetvels, sourcevels, target, source, t)
     source = deepcopy(source)
 
@@ -30,12 +39,20 @@ function pressure!(press, targetvels, sourcevels, target, source, t)
     return press
 end
 
+"""
+Evaluates the pressure induced at `target` by the point vortices `source`.
+The pressure is computed from the unsteady Bernoulli equation.
+"""
 pressure(target, source, t) = pressure!(zeros(Float64, length(target)),
                                                         allocate_velocity(target),
                                                         allocate_velocity(source),
                                                         target, source, t)
 
 # Version of the pressure calculation with freestream
+"""
+Evaluates in-place the pressure induced at `target` by the point vortices `source` and a freestream `freestream`.
+The pressure is computed from the unsteady Bernoulli equation.
+"""
 function pressure!(press, targetvels, sourcevels, target, source, freestream, t)
     source = deepcopy(source)
 
@@ -55,11 +72,20 @@ function pressure!(press, targetvels, sourcevels, target, source, freestream, t)
     return press
 end
 
+"""
+Evaluates the pressure induced at `target` by the point vortices `source` and a freestream `freestream`.
+The pressure is computed from the unsteady Bernoulli equation.
+"""
 pressure(target, source, freestream, t) = pressure!(zeros(Float64, length(target)),
                                                         allocate_velocity(target),
                                                         allocate_velocity(source),
                                                         target, source, freestream, t)
 
+"""
+Evaluates in-place the pressure induced at `target` by the point vortices `source` and a freestream `freestream`.
+The pressure is computed from the unsteady Bernoulli equation.
+The unsteady pressure term ∂ϕ/∂t is computed by finite difference over Δt.
+"""
 function pressure_FD!(press, targetvels, targetϕ, sourcevels, target, source, t, Δt)
     source = deepcopy(source)
 
@@ -85,12 +111,22 @@ function pressure_FD!(press, targetvels, targetϕ, sourcevels, target, source, t
     return press
 end
 
+"""
+Evaluates the pressure induced at `target` by the point vortices `source` and a freestream `freestream`.
+The pressure is computed from the unsteady Bernoulli equation.
+The unsteady pressure term ∂ϕ/∂t is computed by finite difference over Δt.
+"""
 pressure_FD(target, source, t, Δt) = pressure_FD!(zeros(Float64, length(target)),
                                                         allocate_velocity(target),
                                                         zeros(Float64, length(target)),
                                                         allocate_velocity(source),
                                                         target, source, t, Δt)
 
+"""
+Evaluates the pressure induced at `target` by the point vortices `source`.
+The pressure is computed from the unsteady Bernoulli equation.
+This version can be used for automatic differentiation with respect to the positions and strengths of the singularities.
+"""
 function pressure_AD(target, source, t)
 
     source = deepcopy(source)
@@ -113,6 +149,11 @@ function pressure_AD(target, source, t)
     return press
 end
 
+"""
+Evaluates the pressure induced at `target` by the point vortices `source` and a freestream `freestream`.
+The pressure is computed from the unsteady Bernoulli equation.
+This version can be used for automatic differentiation with respect to the positions and strengths of the singularities.
+"""
 function pressure_AD(target, source, freestream, t)
 
     source = deepcopy(source)

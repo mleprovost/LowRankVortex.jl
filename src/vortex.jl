@@ -4,7 +4,7 @@ export VortexConfig, state_to_lagrange, lagrange_to_state
 """
     VortexConfig
 
-A structure to hold the parameters of the
+A structure to hold the parameters of the vortex simulations
 
 ## Fields
 - `Nv::Int64`: number of vortices
@@ -18,7 +18,7 @@ A structure to hold the parameters of the
 
 - `β::Float64`: multiplicative inflation
 
-- `ϵY::Float64`: observation noise std
+- `ϵY::Float64`: standard deviation of the observation noise
 """
 struct VortexConfig
 
