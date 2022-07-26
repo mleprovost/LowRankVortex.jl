@@ -36,6 +36,10 @@ include("plot_recipes.jl")
 include("cylinder/cylindervortex.jl")
 include("cylinder/tools.jl")
 include("cylinder/forecast.jl")
+include("cylinder/generate_twin_experiment.jl")
+include("cylinder/senkf_cylinder_vortexassim.jl")
+include("cylinder/cylinder_pressure.jl")
+
 
 
 
