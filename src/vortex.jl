@@ -50,8 +50,8 @@ struct VortexConfig
     ϵY::Float64
 end
 
-"A routine to convert the state from a vector representation (State representation) to a set of vortex blobs (Lagrangian representation).
- Use lagrange_to_state for the inverse transformation."
+"A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).
+ Use `lagrange_to_state` for the inverse transformation."
 function state_to_lagrange(state::AbstractVector{Float64}, config::VortexConfig; isblob::Bool=true)
     Nv = config.Nv
 
@@ -74,10 +74,9 @@ function state_to_lagrange(state::AbstractVector{Float64}, config::VortexConfig;
 end
 
 "A routine to convert a set of vortex blobs (Lagrangian representation) to a vector representation (State representation).
- Use state_to_lagrange for the inverse transformation."
-function lagrange_to_state(source, config::VortexConfig)
+ Use `state_to_lagrange` for the inverse transformation."
+function lagrange_to_state(source, config::VortexConfig; withcylinder::Bool=false)
     Nv = length(source[1])
-
     @assert Nv == config.Nv
 
     states = Vector{Float64}(undef, 3*Nv)

@@ -141,7 +141,7 @@ function adaptive_lowrankenkf_symmetric_vortexassim(algo::LREnKF, X, tspan::Tupl
 			                              config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), 1:config.Nv, t0+i*Δtobs)
 			else
 				symmetric_analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
-											  config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
+											  config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), Freestream(config.U), 1:config.Nv, t0+i*Δtobs)
 			end
 
 			Jacj = view(Jac,:,1:3*config.Nv)
@@ -206,8 +206,8 @@ function adaptive_lowrankenkf_symmetric_vortexassim(algo::LREnKF, X, tspan::Tupl
 		ϵbrevepert = (1/sqrt(Ne-1))*(ϵbreve .- mean(ϵbreve; dims = 2)[:,1])
 
 		# Apply the Kalman gain in the projected space based on the representers
-		# Burgers G, Jan van Leeuwen P, Evensen G. 1998 Analysis scheme in the ensemble Kalman
-        # filter. Monthly weather review 126, 1719–1724. Solve the linear system for b̆ ∈ R^{ry × Ne}:
+		# (Burgers G, Jan van Leeuwen P, Evensen G. 1998 Analysis scheme in the ensemble Kalman
+        # filter. Monthly weather review 126, 1719–1724.) Solve the linear system for b̆ ∈ R^{ry × Ne}:
 		b̆ = (HXbrevepert*HXbrevepert' + ϵbrevepert*ϵbrevepert')\(U'*(Dϵ\(ystar .- (X[1:Ny,:] + ϵ))))
 		# Lift result to the original space
 		view(X,Ny+1:Ny+Nx,:) .+= Dx*V*(Xbrevepert*HXbrevepert')*b̆

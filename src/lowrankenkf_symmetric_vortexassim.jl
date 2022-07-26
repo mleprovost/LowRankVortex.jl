@@ -134,7 +134,7 @@ function lowrankenkf_symmetric_vortexassim(algo::LREnKF, X, tspan::Tuple{S,S}, c
 				                              config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), 1:config.Nv, t0+i*Δtobs)
 			else
 				symmetric_analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
-				                              config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream,
+				                              config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), Freestream(config.U),
 											  1:config.Nv, t0+i*Δtobs)
 			end
 

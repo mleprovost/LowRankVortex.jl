@@ -26,6 +26,7 @@ Manifest.toml
 
 data/
 notebooks/data/
+localization/
 *.jld
 
 

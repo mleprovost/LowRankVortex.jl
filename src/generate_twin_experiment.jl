@@ -34,9 +34,13 @@ function generate_data_twin_experiment(source, t0, tf, config::VortexConfig, pat
     xt[:,1] .= deepcopy(x0)
     ϵinfl(view(xt,:,1), config)
 
-    yt[:,1] .= pressure(config.ss, source, t0)
-    yt[:,1] .+= config.ϵY*randn(Ny)
+    if withfreestream == true
+        yt[:,1] .= pressure(config.ss, source, freestream, t0)
+    else
+        yt[:,1] .= pressure(config.ss, source, t0)
+    end
 
+    yt[:,1] .+= config.ϵY*randn(Ny)
 
     for i=1:length(Acycle)
         reset_velocity!(cachevels, source)
@@ -55,7 +59,7 @@ function generate_data_twin_experiment(source, t0, tf, config::VortexConfig, pat
 
         # Evaluate the observation operator at `config.ss`
         if withfreestream == true
-            yt[:,1] .= pressure(config.ss, source, freestream, t0+i*config.Δt)
+            yt[:,i+1] .= pressure(config.ss, source, freestream, t0+i*config.Δt)
         else
             yt[:,i+1] .= pressure(config.ss, source, t0+i*config.Δt)
         end

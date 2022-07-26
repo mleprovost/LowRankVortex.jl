@@ -32,5 +32,12 @@ include("lowrankenkf_symmetric_vortexassim.jl")
 include("adaptive_lowrankenkf_symmetric_vortexassim.jl")
 include("plot_recipes.jl")
 
+# Point vortices about a circular cylinder
+include("cylinder/cylindervortex.jl")
+include("cylinder/tools.jl")
+include("cylinder/forecast.jl")
+
+
+
 
 end # module

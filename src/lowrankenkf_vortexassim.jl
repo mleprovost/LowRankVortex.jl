@@ -157,7 +157,7 @@ function lowrankenkf_vortexassim(algo::LREnKF, X, tspan::Tuple{S,S}, config::Vor
 		# analytically.
 		@inbounds Threads.@threads for j=1:Ne
 			# J_AD = AD_symmetric_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), t0+i*Δtobs)
-			J = analytical_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, t0+i*Δtobs)
+			J = analytical_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), Freestream(config.U), t0+i*Δtobs)
 			Jj = J[:,1:3*config.Nv]
 			Cx .+= 1/(Ne-1)*(inv(Dϵ)*Jj*Dx)'*(inv(Dϵ)*Jj*Dx)
 			Cy .+= 1/(Ne-1)*(inv(Dϵ)*Jj*Dx)*(inv(Dϵ)*Jj*Dx)'
