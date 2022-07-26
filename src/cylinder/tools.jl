@@ -33,17 +33,21 @@ wvd(z,zv;ϵ=0.01) = -0.5im/π*conj(z-zv)/(abs2(z-zv)+ϵ^2)
 wvi(z,zv) = -flag*0.5im/π*(-1/(z-1/conj(zv)) + 1/z)
 wv(z,zv;ϵ=0.01) = wvd(z,zv;ϵ=ϵ) + wvi(z,zv)
 
-dwvddz(z,zv;ϵ=0.01) = 0.5im/π/(z-zv)^2
+dwvddz(z,zv;ϵ=0.01) = 0.5im*conj(z-zv)^2/π/(abs2(z-zv) + ϵ^2)^2
+dwvddzstar(z,zv;ϵ=0.01) = -0.5im*ϵ^2/π/(abs2(z-zv) + ϵ^2)^2
 dwvidz(z,zv) = -flag*0.5im/π*(1/(z-1/conj(zv))^2-1/z^2)
 dwvdz(z,zv;ϵ=0.01) = dwvddz(z,zv;ϵ=ϵ) + dwvidz(z,zv)
 dwvddzv(z,zv;ϵ=0.01) = -dwvddz(z,zv;ϵ=ϵ)
+dwvddzvstar(z,zv;ϵ=0.01) = -dwvddzstar(z,zv;ϵ=ϵ)
 dwvidzvstar(z,zv) = -flag*0.5im/π/conj(zv)^2/(z-1/conj(zv))^2
+dwvdzvstar(z,zv;ϵ=0.01) = dwvddzvstar(z,zv;ϵ=ϵ) + dwvidzvstar(z,zv)
 
 dFddzv(z,zv;ϵ=0.01) = -wvd(z,zv;ϵ=ϵ)
 dFidzvstar(z,zv) = flag*0.5im/π/conj(zv)^2/(z-1/conj(zv))
 dFdzv(z,zv;ϵ=0.01) = dFddzv(z,zv;ϵ=0.01) + conj(dFidzvstar(z,zv))
 
 d2Fddzv2(z,zv;ϵ=0.01) = -dwvddz(z,zv;ϵ=ϵ)
+d2Fddzvdvzstar(z,zv;ϵ=0.01) = -dwvddzstar(z,zv;ϵ=ϵ)
 d2Fidzvstar2(z,zv) = -flag*0.5im/π/conj(zv)^3/(z-1/conj(zv))*(2 + 1/conj(zv)/(z-1/conj(zv)))
 d2Fdzv2(z,zv;ϵ=0.01) = d2Fddzv2(z,zv;ϵ=0.01) + conj(d2Fidzvstar2(z,zv))
 
@@ -53,13 +57,13 @@ P(z,zv;kwargs...) = -0.5*abs2(wv(z,zv;kwargs...)) - real(dFdzv(z,zv;kwargs...)*c
                            real(dFdzv(z,zvj;kwargs...)*conj(wv(zvj,zvk;kwargs...))) -
                            real(dFdzv(z,zvk;kwargs...)*conj(wv(zvk,zvj;kwargs...)))
 
-dPdzv(z,zv;kwargs...) = -0.5*(dwvddzv(z,zv;kwargs...)*conj(wv(z,zv;kwargs...)) + wv(z,zv;kwargs...)*conj(dwvidzvstar(z,zv))) -
+dPdzv(z,zv;kwargs...) = -0.5*(dwvddzv(z,zv;kwargs...)*conj(wv(z,zv;kwargs...)) + wv(z,zv;kwargs...)*conj(dwvdzvstar(z,zv;kwargs...))) -
                         0.5*(d2Fdzv2(z,zv;kwargs...)*conj(wvi(zv,zv)) + dFdzv(z,zv;kwargs...)*conj(dwvidzvstar(zv,zv))) -
                         0.5*(conj(dFdzv(z,zv;kwargs...))*dwvidz(zv,zv))
 
-dΠdzvl(z,zvl,zvk;kwargs...) = -0.5*(dwvddzv(z,zvl;kwargs...)*conj(wv(z,zvk;kwargs...)) + conj(dwvidzvstar(z,zvl))*wv(z,zvk;kwargs...)) -
-                               0.5*(d2Fdzv2(z,zvl;kwargs...)*conj(wv(zvl,zvk;kwargs...)) + conj(dFdzv(z,zvl;kwargs...))*dwvdz(zvl,zvk;kwargs...)) -
-                               0.5*(dFdzv(z,zvk;kwargs...)*conj(dwvidzvstar(zvk,zvl)) + conj(dFdzv(z,zvk;kwargs...))*dwvddzv(zvk,zvl;kwargs...))
+dΠdzvl(z,zvl,zvk;kwargs...) = -0.5*(dwvddzv(z,zvl;kwargs...)*conj(wv(z,zvk;kwargs...)) + conj(dwvddzvstar(z,zvl)+dwvidzvstar(z,zvl))*wv(z,zvk;kwargs...)) -
+                               0.5*(d2Fdzv2(z,zvl;kwargs...)*conj(wv(zvl,zvk;kwargs...)) + dFdzv(z,zvl;kwargs...)*conj(dwvddzstar(zvl,zvk)) + conj(d2Fddzvdvzstar(z,zvl;kwargs...))*wvd(zvl,zvk;kwargs...)  + conj(dFdzv(z,zvl;kwargs...))*dwvdz(zvl,zvk;kwargs...)) -
+                               0.5*(dFdzv(z,zvk;kwargs...)*conj(dwvdzvstar(zvk,zvl;kwargs...)) + conj(dFdzv(z,zvk;kwargs...))*dwvddzv(zvk,zvl;kwargs...))
 
 
 for f in [:F,:w]
@@ -71,10 +75,7 @@ for f in [:F,:w]
        out = complex(0)
        for vj in v
            zj = Elements.position(vj)
-           # out += strength(vj)*($vd(z,zj;kwargs...) + $vi(z,zj;kwargs...))
-           # @show $vi(z,zj)
-           # @show $vd(z,zj;kwargs...)
-           out += strength(vj)*($vd(z,zj;kwargs...) + $vi(z,zj))
+           out += strength(vj)*($vd(z,zj;kwargs...) + $vi(z,zj;kwargs...))
        end
        return out
    end
