@@ -75,7 +75,8 @@ for f in [:F,:w]
        out = complex(0)
        for vj in v
            zj = Elements.position(vj)
-           out += strength(vj)*($vd(z,zj;kwargs...) + $vi(z,zj;kwargs...))
+           # out += strength(vj)*($vd(z,zj;kwargs...) + $vi(z,zj;kwargs...))
+           out += strength(vj)*($vd(z,zj;kwargs...) + $vi(z,zj))
        end
        return out
    end
