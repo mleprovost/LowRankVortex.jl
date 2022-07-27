@@ -18,12 +18,6 @@ strength(v::Vector{T}) where {T<:PotentialFlow.Points.Point} = map(vj -> strengt
 
 # Define the functions that comprise the pressure and its gradients
 
-# A few helper routines
-strength(v::Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}) = v.S
-strength(v::Vector{T}) where {T<:PotentialFlow.Points.Point} = map(vj -> strength(vj),v)
-
-# Define the functions that comprise the pressure and its gradients
-
 Fvd(z,zv) = -0.5im/π*log(z-zv)
 Fvi(z,zv) = cylinder_flag ? -0.5im/π*(-log(z-1/conj(zv)) + log(z)) : complex(0.0)
 Fv(z,zv) = Fvd(z,zv) + Fvi(z,zv)
