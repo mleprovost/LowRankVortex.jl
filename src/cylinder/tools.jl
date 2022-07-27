@@ -1,4 +1,5 @@
-export create_random_vortices
+export create_random_vortices, pressure, dpdzv, dpdΓv
+
 
 # Create a set of n random point vortices in the range [-2,2]x[-2,2], all of which are outside the unit circle
 function create_random_vortices(n::Integer;σ=0.01,cylinder=true)
@@ -17,8 +18,3 @@ function create_random_vortices(n::Integer;σ=0.01,cylinder=true)
     end
     return Vortex.Blob.(z,Γ,σ)
 end
-<<<<<<< HEAD
-=======
-
-
->>>>>>> Fixed most of the bugs in the sensitivity derivatives
