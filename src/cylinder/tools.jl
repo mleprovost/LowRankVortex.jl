@@ -1,5 +1,7 @@
 export create_random_vortices, pressure, dpdzv, dpdΓv
 
+const cylinder_flag = false
+
 
 # Create a set of n random point vortices in the range [-2,2]x[-2,2], all of which are outside the unit circle
 function create_random_vortices(n::Integer;σ=0.01)
@@ -10,7 +12,7 @@ function create_random_vortices(n::Integer;σ=0.01)
         ztest = 4.0(rand(ComplexF64)-0.5-im*0.5)
         # Γtest = 2.0(rand(Float64)-0.5)
         Γtest = 2.0*rand(Float64)+1.0
-        if (abs2(ztest)>1.0)
+        if (abs2(ztest)>=1.0*cylinder_flag)
             push!(z,ztest)
             push!(Γ,Γtest)
             num += 1
@@ -25,30 +27,29 @@ strength(v::Vector{T}) where {T<:PotentialFlow.Points.Point} = map(vj -> strengt
 
 # Define the functions that comprise the pressure and its gradients
 
-const flag = 1
 Fvd(z,zv) = -0.5im/π*log(z-zv)
-Fvi(z,zv) = -flag*0.5im/π*(-log(z-1/conj(zv)) + log(z))
+Fvi(z,zv) = cylinder_flag ? -0.5im/π*(-log(z-1/conj(zv)) + log(z)) : complex(0.0)
 Fv(z,zv) = Fvd(z,zv) + Fvi(z,zv)
 wvd(z,zv;ϵ=0.01) = -0.5im/π*conj(z-zv)/(abs2(z-zv)+ϵ^2)
-wvi(z,zv) = -flag*0.5im/π*(-1/(z-1/conj(zv)) + 1/z)
+wvi(z,zv) = cylinder_flag ? -0.5im/π*(-1/(z-1/conj(zv)) + 1/z) : complex(0.0)
 wv(z,zv;ϵ=0.01) = wvd(z,zv;ϵ=ϵ) + wvi(z,zv)
 
 dwvddz(z,zv;ϵ=0.01) = 0.5im*conj(z-zv)^2/π/(abs2(z-zv) + ϵ^2)^2
 dwvddzstar(z,zv;ϵ=0.01) = -0.5im*ϵ^2/π/(abs2(z-zv) + ϵ^2)^2
-dwvidz(z,zv) = -flag*0.5im/π*(1/(z-1/conj(zv))^2-1/z^2)
+dwvidz(z,zv) = cylinder_flag ? -0.5im/π*(1/(z-1/conj(zv))^2-1/z^2) : complex(0.0)
 dwvdz(z,zv;ϵ=0.01) = dwvddz(z,zv;ϵ=ϵ) + dwvidz(z,zv)
 dwvddzv(z,zv;ϵ=0.01) = -dwvddz(z,zv;ϵ=ϵ)
 dwvddzvstar(z,zv;ϵ=0.01) = -dwvddzstar(z,zv;ϵ=ϵ)
-dwvidzvstar(z,zv) = -flag*0.5im/π/conj(zv)^2/(z-1/conj(zv))^2
+dwvidzvstar(z,zv) = cylinder_flag ? -0.5im/π/conj(zv)^2/(z-1/conj(zv))^2 : complex(0.0)
 dwvdzvstar(z,zv;ϵ=0.01) = dwvddzvstar(z,zv;ϵ=ϵ) + dwvidzvstar(z,zv)
 
 dFddzv(z,zv;ϵ=0.01) = -wvd(z,zv;ϵ=ϵ)
-dFidzvstar(z,zv) = flag*0.5im/π/conj(zv)^2/(z-1/conj(zv))
+dFidzvstar(z,zv) = cylinder_flag ? 0.5im/π/conj(zv)^2/(z-1/conj(zv)) : complex(0.0)
 dFdzv(z,zv;ϵ=0.01) = dFddzv(z,zv;ϵ=0.01) + conj(dFidzvstar(z,zv))
 
-d2Fddzv2(z,zv;ϵ=0.01) = -dwvddz(z,zv;ϵ=ϵ)
-d2Fddzvdvzstar(z,zv;ϵ=0.01) = -dwvddzstar(z,zv;ϵ=ϵ)
-d2Fidzvstar2(z,zv) = -flag*0.5im/π/conj(zv)^3/(z-1/conj(zv))*(2 + 1/conj(zv)/(z-1/conj(zv)))
+d2Fddzv2(z,zv;ϵ=0.01) = dwvddz(z,zv;ϵ=ϵ)
+d2Fddzvdvzstar(z,zv;ϵ=0.01) = dwvddzstar(z,zv;ϵ=ϵ)
+d2Fidzvstar2(z,zv) = cylinder_flag ? -0.5im/π/conj(zv)^3/(z-1/conj(zv))*(2 + 1/conj(zv)/(z-1/conj(zv))) : complex(0.0)
 d2Fdzv2(z,zv;ϵ=0.01) = d2Fddzv2(z,zv;ϵ=0.01) + conj(d2Fidzvstar2(z,zv))
 
 
