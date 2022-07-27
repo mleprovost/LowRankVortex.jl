@@ -1,5 +1,7 @@
 export measure_state_cylinder, pressure, dpdzv, dpdΓv
 
+const cylinder_flag = false
+
 
 """
 Evaluates the pressure induced at `config.ss` by the regularized point vortices stored in `state`,
@@ -16,31 +18,30 @@ strength(v::Vector{T}) where {T<:PotentialFlow.Points.Point} = map(vj -> strengt
 
 # Define the functions that comprise the pressure and its gradients
 
-const flag = 1
 Fvd(z,zv) = -0.5im/π*log(z-zv)
-Fvi(z,zv) = -flag*0.5im/π*(-log(z-1/conj(zv)) + log(z))
+Fvi(z,zv) = cylinder_flag ? -0.5im/π*(-log(z-1/conj(zv)) + log(z)) : complex(0.0)
 Fv(z,zv) = Fvd(z,zv) + Fvi(z,zv)
 wvd(z,zv;ϵ=0.01) = -0.5im/π*conj(z-zv)/(abs2(z-zv)+ϵ^2)
-wvi(z,zv) = -flag*0.5im/π*(-1/(z-1/conj(zv)) + 1/z)
+wvi(z,zv) = cylinder_flag ? -0.5im/π*(-1/(z-1/conj(zv)) + 1/z) : complex(0.0)
 wv(z,zv;ϵ=0.01) = wvd(z,zv;ϵ=ϵ) + wvi(z,zv)
 
 dwvddz(z,zv;ϵ=0.01) = 0.5im*conj(z-zv)^2/π/(abs2(z-zv) + ϵ^2)^2
 dwvddzstar(z,zv;ϵ=0.01) = -0.5im*ϵ^2/π/(abs2(z-zv) + ϵ^2)^2
-dwvidz(z,zv) = -flag*0.5im/π*(1/(z-1/conj(zv))^2-1/z^2)
+dwvidz(z,zv) = cylinder_flag ? -0.5im/π*(1/(z-1/conj(zv))^2-1/z^2) : complex(0.0)
 dwvdz(z,zv;ϵ=0.01) = dwvddz(z,zv;ϵ=ϵ) + dwvidz(z,zv)
 dwvddzv(z,zv;ϵ=0.01) = -dwvddz(z,zv;ϵ=ϵ)
 dwvddzvstar(z,zv;ϵ=0.01) = -dwvddzstar(z,zv;ϵ=ϵ)
-dwvidzvstar(z,zv) = -flag*0.5im/π/conj(zv)^2/(z-1/conj(zv))^2
+dwvidzvstar(z,zv) = cylinder_flag ? -0.5im/π/conj(zv)^2/(z-1/conj(zv))^2 : complex(0.0)
 dwvdzvstar(z,zv;ϵ=0.01) = dwvddzvstar(z,zv;ϵ=ϵ) + dwvidzvstar(z,zv)
 
 dFddzv(z,zv;ϵ=0.01) = -wvd(z,zv;ϵ=ϵ)
-dFidzvstar(z,zv) = flag*0.5im/π/conj(zv)^2/(z-1/conj(zv))
-dFdzv(z,zv;ϵ=0.01) = dFddzv(z,zv;ϵ=0.01) + conj(dFidzvstar(z,zv))
+dFidzvstar(z,zv) = cylinder_flag ? 0.5im/π/conj(zv)^2/(z-1/conj(zv)) : complex(0.0)
+dFdzv(z,zv;ϵ=0.01) = dFddzv(z,zv;ϵ=ϵ) + conj(dFidzvstar(z,zv))
 
-d2Fddzv2(z,zv;ϵ=0.01) = -dwvddz(z,zv;ϵ=ϵ)
-d2Fddzvdvzstar(z,zv;ϵ=0.01) = -dwvddzstar(z,zv;ϵ=ϵ)
-d2Fidzvstar2(z,zv) = -flag*0.5im/π/conj(zv)^3/(z-1/conj(zv))*(2 + 1/conj(zv)/(z-1/conj(zv)))
-d2Fdzv2(z,zv;ϵ=0.01) = d2Fddzv2(z,zv;ϵ=0.01) + conj(d2Fidzvstar2(z,zv))
+d2Fddzv2(z,zv;ϵ=0.01) = dwvddz(z,zv;ϵ=ϵ)
+d2Fddzvdvzstar(z,zv;ϵ=0.01) = dwvddzstar(z,zv;ϵ=ϵ)
+d2Fidzvstar2(z,zv) = cylinder_flag ? -0.5im/π/conj(zv)^3/(z-1/conj(zv))*(2 + 1/conj(zv)/(z-1/conj(zv))) : complex(0.0)
+d2Fdzv2(z,zv;ϵ=0.01) = d2Fddzv2(z,zv;ϵ=ϵ) + conj(d2Fidzvstar2(z,zv))
 
 
 P(z,zv;kwargs...) = -0.5*abs2(wv(z,zv;kwargs...)) - real(dFdzv(z,zv;kwargs...)*conj(wvi(zv,zv)))
@@ -52,8 +53,8 @@ dPdzv(z,zv;kwargs...) = -0.5*(dwvddzv(z,zv;kwargs...)*conj(wv(z,zv;kwargs...)) +
                         0.5*(d2Fdzv2(z,zv;kwargs...)*conj(wvi(zv,zv)) + dFdzv(z,zv;kwargs...)*conj(dwvidzvstar(zv,zv))) -
                         0.5*(conj(dFdzv(z,zv;kwargs...))*dwvidz(zv,zv))
 
-dΠdzvl(z,zvl,zvk;kwargs...) = -0.5*(dwvddzv(z,zvl;kwargs...)*conj(wv(z,zvk;kwargs...)) + conj(dwvddzvstar(z,zvl)+dwvidzvstar(z,zvl))*wv(z,zvk;kwargs...)) -
-                               0.5*(d2Fdzv2(z,zvl;kwargs...)*conj(wv(zvl,zvk;kwargs...)) + dFdzv(z,zvl;kwargs...)*conj(dwvddzstar(zvl,zvk)) + conj(d2Fddzvdvzstar(z,zvl;kwargs...))*wvd(zvl,zvk;kwargs...)  + conj(dFdzv(z,zvl;kwargs...))*dwvdz(zvl,zvk;kwargs...)) -
+dΠdzvl(z,zvl,zvk;kwargs...) = -0.5*(dwvddzv(z,zvl;kwargs...)*conj(wv(z,zvk;kwargs...)) + conj(dwvddzvstar(z,zvl;kwargs...)+dwvidzvstar(z,zvl))*wv(z,zvk;kwargs...)) -
+                               0.5*(d2Fdzv2(z,zvl;kwargs...)*conj(wv(zvl,zvk;kwargs...)) + dFdzv(z,zvl;kwargs...)*conj(dwvddzstar(zvl,zvk;kwargs...)) + conj(d2Fddzvdvzstar(z,zvl;kwargs...))*wvd(zvl,zvk;kwargs...)  + conj(dFdzv(z,zvl;kwargs...))*dwvdz(zvl,zvk;kwargs...)) -
                                0.5*(dFdzv(z,zvk;kwargs...)*conj(dwvdzvstar(zvk,zvl;kwargs...)) + conj(dFdzv(z,zvk;kwargs...))*dwvddzv(zvk,zvl;kwargs...))
 
 
