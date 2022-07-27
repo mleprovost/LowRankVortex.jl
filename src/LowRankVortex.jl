@@ -27,6 +27,7 @@ include("forecast.jl")
 include("generate_twin_experiment.jl")
 include("senkf_vortexassim.jl")
 include("senkf_symmetric_vortexassim.jl")
+include("localized_senkf_symmetric_vortexassim.jl")
 include("lowrankenkf_vortexassim.jl")
 include("lowrankenkf_symmetric_vortexassim.jl")
 include("adaptive_lowrankenkf_symmetric_vortexassim.jl")
@@ -37,8 +38,10 @@ include("cylinder/cylindervortex.jl")
 include("cylinder/tools.jl")
 include("cylinder/forecast.jl")
 include("cylinder/generate_twin_experiment.jl")
-include("cylinder/senkf_cylinder_vortexassim.jl")
 include("cylinder/cylinder_pressure.jl")
+include("cylinder/senkf_cylinder_vortexassim.jl")
+include("cylinder/localized_senkf_cylinder_vortexassim.jl")
+
 
 
 
