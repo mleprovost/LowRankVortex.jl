@@ -1,4 +1,4 @@
-export create_random_vortices, pressure, dpdzv, dpdΓv
+export create_random_vortices
 
 
 # Create a set of n random point vortices in the range [-2,2]x[-2,2], all of which are outside the unit circle
