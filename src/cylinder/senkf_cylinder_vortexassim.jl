@@ -78,14 +78,6 @@ function senkf_cylinder_vortexassim(algo::StochEnKF, X, tspan::Tuple{S,S}, confi
 		ϵmul(X, Ny+1, Ny+Nx)
 		ϵx(X, Ny, Nx, config)
 
-		# Filter state
-		# if algo.isfiltered == true
-		# 	@inbounds for i=1:Ne
-		# 		x = view(X, Ny+1:Ny+Nx, i)
-		# 		x .= filter_state!(x, config)
-		# 	end
-		# end
-
 		# Evaluate the observation operator for the different ensemble members
 		observe(h, X, t0+i*Δtobs, Ny, Nx; P = P)
 
@@ -109,14 +101,6 @@ function senkf_cylinder_vortexassim(algo::StochEnKF, X, tspan::Tuple{S,S}, confi
 		# Update the ensemble members according to:
 		# x^{a,i} = x^i - Σ_{X,Y}b^i, with b^i =  Σ_Y^{-1}(h(x^i) + ϵ^i - ystar)
 		view(X,Ny+1:Ny+Nx,:) .+= (Xpert*HXpert')*b
-
-		# Filter state
-		# if algo.isfiltered == true
-		# 	@inbounds for i=1:Ne
-		# 		x = view(X, Ny+1:Ny+Nx, i)
-		# 		x .= filter_state!(x, config)
-		# 	end
-		# end
 
 		push!(Xa, deepcopy(state(X, Ny, Nx)))
 	end
