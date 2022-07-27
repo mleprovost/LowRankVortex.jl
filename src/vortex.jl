@@ -19,6 +19,8 @@ A structure to hold the parameters of the vortex simulations
 - `β::Float64`: multiplicative inflation
 
 - `ϵY::Float64`: standard deviation of the observation noise
+
+- `advect_flag::Bool`: true if the vortex system should be advected
 """
 struct VortexConfig
 
@@ -48,7 +50,12 @@ struct VortexConfig
 
     "Observation noise std"
     ϵY::Float64
+
+    "Advect flag"
+    advect_flag::Bool
 end
+
+VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY) = VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,true)
 
 "A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).
  Use `lagrange_to_state` for the inverse transformation."

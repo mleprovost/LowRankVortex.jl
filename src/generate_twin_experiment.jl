@@ -50,7 +50,9 @@ function generate_data_twin_experiment(source, t0, tf, config::VortexConfig, pat
         end
 
         # Advect the system
-        advect!(source, source, cachevels, config.Δt)
+        if config.advect_flag
+          advect!(source, source, cachevels, config.Δt)
+        end
         xt[:,i+1] .= deepcopy(lagrange_to_state(source, config))
 
         # Perturb the state

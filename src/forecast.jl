@@ -27,7 +27,9 @@ function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestr
 		end
 
 		# Advect the system
-		advect!(source, source, cachevels, config.Δt)
+		if config.advect_flag
+			advect!(source, source, cachevels, config.Δt)
+		end
 
 		X[Ny+1:Nypx, i] .= lagrange_to_state(source, config)
 	end
@@ -62,7 +64,9 @@ function symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; w
 
 		# We only care about the transport of the top vortices
 		# Advect the system
-		advect!(source[1:1], source[1:1], cachevels[1:1], config.Δt)
+		if config.advect_flag
+			advect!(source[1:1], source[1:1], cachevels[1:1], config.Δt)
+		end
 
 		X[Ny+1:Nypx, i] .= lagrange_to_state(source, config)
 	end

@@ -39,7 +39,9 @@ function generate_data_cylinder_twin_experiment(source, t0, tf, config::VortexCo
         cachevels = conj.(LowRankVortex.w(Elements.position(source),source; ϵ = config.δ))
 
         # Advect the set of vortices
-        advect!(source, source, cachevels, config.Δt)
+        if config.advect_flag
+          advect!(source, source, cachevels, config.Δt)
+        end
         xt[:,i+1] .= deepcopy(cylinder_lagrange_to_state(source, config))
 
         # Perturb the state

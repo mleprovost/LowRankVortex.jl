@@ -21,7 +21,9 @@ function cylinder_vortex(X, t::Float64, Ny, Nx, cachevels, config)
 		cachevels = conj.(LowRankVortex.w(Elements.position(source),source; ϵ = config.δ))
 
 		# Advect the set of vortices
-		advect!(source, source, cachevels, config.Δt)
+		if config.advect_flag
+			advect!(source, source, cachevels, config.Δt)
+		end
 		X[Ny+1:Nypx, i] .= cylinder_lagrange_to_state(source, config)
 	end
 
