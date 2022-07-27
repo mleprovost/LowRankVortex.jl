@@ -23,7 +23,7 @@ end
 
 "A routine to convert a set of vortex blobs (Lagrangian representation) to a vector representation (State representation).
  Use `cy;inder_state_to_lagrange` for the inverse transformation."
-function cylinder_lagrange_to_state(source, config::VortexConfig; withcylinder::Bool=false)
+function cylinder_lagrange_to_state(source, config::VortexConfig)
     Nv = length(source)
     @assert Nv == config.Nv
 

@@ -7,7 +7,7 @@ and an optional freestream of amplitude `config.U`.
 The pressure is computed from the unsteady Bernoulli equation.
 """
 measure_state_cylinder(state, t, config::VortexConfig) =
-pressure(real(config.ss), cylinder_state_to_lagrange(state, config); ϵ = config.δ)
+pressure(config.ss, cylinder_state_to_lagrange(state, config); ϵ = config.δ)
 
 
 # A few helper routines

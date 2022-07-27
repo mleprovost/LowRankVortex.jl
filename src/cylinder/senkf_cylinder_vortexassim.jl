@@ -1,4 +1,4 @@
-export senkf_symmetric_vortexassim
+export senkf_cylinder_vortexassim
 
 
 """
@@ -15,10 +15,9 @@ The user should provide the following arguments:
 - `config::VortexConfig`: A configuration file for the vortex simulation
 - `data::SyntheticData`: A structure that holds the history of the state and observation variables
 Optional arguments:
-- `withfreestream::Bool`: equals `true` if a freestream is applied
 - `P::Parallel = serial`: Determine whether some steps of the routine can be runned in parallel.
 """
-function senkf_symmetric_vortexassim(algo::StochEnKF, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData; withfreestream::Bool = false, P::Parallel = serial) where {S<:Real}
+function senkf_cylinder_vortexassim(algo::StochEnKF, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData; P::Parallel = serial) where {S<:Real}
 
 	# Define the inflation parameters
 	ϵX = config.ϵX
@@ -52,10 +51,10 @@ function senkf_symmetric_vortexassim(algo::StochEnKF, X, tspan::Tuple{S,S}, conf
 	# Define the observation operator
 	h(x, t) = measure_state_cylinder(x, t, config)
 	# Define an interpolation function in time and space of the true pressure field
-	press_itp = CubicSplineInterpolation((LinRange(real(config.ss[1]), real(config.ss[end]), length(config.ss)),
-	                               t0:data.Δt:tf), data.yt, extrapolation_bc =  Line())
+	# θss = range(0,2π,length=Ny+1)[1:end-1]
+	press_itp = CubicSplineInterpolation((1:Ny, t0:data.Δt:tf), data.yt, extrapolation_bc =  Line())
 
-	yt(t) = press_itp(real.(config.ss), t)
+	yt(t) = press_itp(1:Ny, t)
 	Xf = Array{Float64,2}[]
 	push!(Xf, copy(state(X, Ny, Nx)))
 
@@ -75,7 +74,6 @@ function senkf_symmetric_vortexassim(algo::StochEnKF, X, tspan::Tuple{S,S}, conf
 
 		# Get the true observation ystar
 		ystar .= yt(t0+i*Δtobs)
-
 		# Perform state inflation
 		ϵmul(X, Ny+1, Ny+Nx)
 		ϵx(X, Ny, Nx, config)
@@ -90,6 +88,8 @@ function senkf_symmetric_vortexassim(algo::StochEnKF, X, tspan::Tuple{S,S}, conf
 
 		# Evaluate the observation operator for the different ensemble members
 		observe(h, X, t0+i*Δtobs, Ny, Nx; P = P)
+
+		@show norm(mean(X[1:Ny,:]; dims = 2)[:,1])
 
 		# Generate samples from the observation noise
 		ϵ = algo.ϵy.σ*randn(Ny, Ne) .+ algo.ϵy.m
