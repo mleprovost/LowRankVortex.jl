@@ -39,8 +39,12 @@ include("cylinder/tools.jl")
 include("cylinder/forecast.jl")
 include("cylinder/generate_twin_experiment.jl")
 include("cylinder/cylinder_pressure.jl")
+include("cylinder/cylinder_analytical_jacobian_pressure.jl")
 include("cylinder/senkf_cylinder_vortexassim.jl")
 include("cylinder/localized_senkf_cylinder_vortexassim.jl")
+include("cylinder/adaptive_lowrankenkf_cylinder_vortexassim.jl")
+
+
 
 
 

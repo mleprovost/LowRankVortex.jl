@@ -15,18 +15,15 @@ The user should provide the following arguments:
 - `config::VortexConfig`: A configuration file for the vortex simulation
 - `data::SyntheticData`: A structure that holds the history of the state and observation variables
 Optional arguments:
-- `withfreestream::Bool`: equals `true` if a freestream is applied
 - `rxdefault::Union{Nothing, Int64} = 100`: the truncated dimension of the informative subspace of the state space
 - `rydefault::Union{Nothing, Int64} = 100`: the truncated dimension of the informative subspace of the observations space
 - `isadaptive::Bool=false`: equals `true` if the ranks are not fixed but determined to capture at least `ratio` of
    the cumulative energy of the state and observation Gramians, see Le Provost et al., 2022 for further details.
 - `ratio::Float64=0.95`: the ratio of cumulative energy of the state and observation Gramians to retain.
-- `P::Parallel = serial`: Determine whether some steps of the routine can be runned in parallel.
-                          In the current version of the code, only the serial version is validated.
 """
 function adaptive_lowrankenkf_cylinder_vortexassim(algo::LREnKF, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData;
-	                        withfreestream::Bool = false, rxdefault::Union{Nothing, Int64} = 100, rydefault::Union{Nothing, Int64} = 100,
-							isadaptive::Bool=false, ratio::Float64=0.95, P::Parallel = serial) where {S<:Real}
+	                        rxdefault::Union{Nothing, Int64} = 100, rydefault::Union{Nothing, Int64} = 100,
+							isadaptive::Bool=false, ratio::Float64=0.95) where {S<:Real}
 
 	# Define the inflation parameters
 	ϵX = config.ϵX
@@ -56,7 +53,7 @@ function adaptive_lowrankenkf_cylinder_vortexassim(algo::LREnKF, X, tspan::Tuple
 	ystar = zeros(Ny)
 
 	# Cache variable for the velocities
-	cachevels = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
+	cachevels = allocate_velocity(cylinder_state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
 	# Define the observation operator
 	h(x, t) = measure_state_cylinder(x, t, config)
@@ -96,7 +93,7 @@ function adaptive_lowrankenkf_cylinder_vortexassim(algo::LREnKF, X, tspan::Tuple
 		ϵx(X, Ny, Nx, config)
 
 		# Evaluate the observation operator for the different ensemble members
-		observe(h, X, t0+i*Δtobs, Ny, Nx; P = P)
+		observe(h, X, t0+i*Δtobs, Ny, Nx)
 
 		# Generate samples from the observation noise
 		ϵ = algo.ϵy.σ*randn(Ny, Ne) .+ algo.ϵy.m
@@ -112,15 +109,11 @@ function adaptive_lowrankenkf_cylinder_vortexassim(algo::LREnKF, X, tspan::Tuple
 		# Compute the state and observation Gramians. The Jacobian of the pressure field is computed
 		# analytically by exploiting the symmetry of the problem about the x-axis
 		@inbounds Threads.@threads for j=1:Ne
-			# @time Jac_AD = AD_symmetric_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), t0+i*Δtobs)
-			# Jac = analytical_jacobian_pressure(config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
-			# analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
-			#                               config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), freestream, 1:config.Nv, t0+i*Δtobs)
-		    cylinder_analytical_jacobian_pressure!(Jac, config.ss, vcat(cylinder_state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), 1:config.Nv, t0+i*Δtobs)
 
-			Jacj = view(Jac,:,1:3*config.Nv)
-			Cx .+= 1/(Ne-1)*(inv(Dϵ)*Jacj*Dx)'*(inv(Dϵ)*Jacj*Dx)
-			Cy .+= 1/(Ne-1)*(inv(Dϵ)*Jacj*Dx)*(inv(Dϵ)*Jacj*Dx)'
+	    	cylinder_analytical_jacobian_pressure!(Jac, config.ss, cylinder_state_to_lagrange(X[Ny+1:Ny+Nx,j], config))
+
+			Cx .+= 1/(Ne-1)*(inv(Dϵ)*Jac*Dx)'*(inv(Dϵ)*Jac*Dx)
+			Cy .+= 1/(Ne-1)*(inv(Dϵ)*Jac*Dx)*(inv(Dϵ)*Jac*Dx)'
 		end
 
 		if typeof(rydefault)<:Int64
