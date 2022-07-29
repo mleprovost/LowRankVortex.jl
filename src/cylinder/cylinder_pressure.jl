@@ -1,11 +1,10 @@
 export measure_state_cylinder, pressure, dpdzv, dpdΓv
 
-const cylinder_flag = false
-
+const cylinder_flag = true
 
 """
-Evaluates the pressure induced at `config.ss` by the regularized point vortices stored in `state`,
-and an optional freestream of amplitude `config.U`.
+Evaluates the pressure induced at `config.ss` by the regularized point vortices stored in `state`
+outside a circle of radius 1 centered about the origin.
 The pressure is computed from the unsteady Bernoulli equation.
 """
 measure_state_cylinder(state, t, config::VortexConfig) =
@@ -76,6 +75,7 @@ for f in [:F,:w]
 
    @eval $f(z::AbstractArray,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> $f(zj,v;kwargs...),z)
 end
+
 
 
 ### Define the pressure and its gradients

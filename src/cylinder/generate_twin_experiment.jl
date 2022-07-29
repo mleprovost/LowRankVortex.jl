@@ -36,6 +36,7 @@ function generate_data_cylinder_twin_experiment(source, t0, tf, config::VortexCo
 
     for i=1:length(Acycle)
         reset_velocity!(cachevels, source)
+        
         cachevels = conj.(LowRankVortex.w(Elements.position(source),source; ϵ = config.δ))
 
         # Advect the set of vortices

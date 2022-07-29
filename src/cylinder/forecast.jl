@@ -15,7 +15,7 @@ function cylinder_vortex(X, t::Float64, Ny, Nx, cachevels, config)
 	@inbounds for i = 1:Ne
 		col = view(X, Ny+1:Nypx, i)
 		source = cylinder_state_to_lagrange(col, config)
-
+		
 		# Compute the induced velocity of the point vortices in the presence of a cylinder. We use the circle theorem
 		reset_velocity!(cachevels, source)
 		cachevels = conj.(LowRankVortex.w(Elements.position(source),source; ϵ = config.δ))
