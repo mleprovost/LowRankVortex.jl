@@ -89,6 +89,10 @@ function adaptive_lowrankenkf_symmetric_vortexassim(algo::LREnKF, X, tspan::Tupl
 	Xa = Array{Float64,2}[]
 	push!(Xa, copy(state(X, Ny, Nx)))
 
+  Cx_history = Array{Float64,2}[]
+  Cy_history = Array{Float64,2}[]
+
+
 	# Run the ensemble filter
 	for i=1:length(Acycle)
 
@@ -212,6 +216,7 @@ function adaptive_lowrankenkf_symmetric_vortexassim(algo::LREnKF, X, tspan::Tupl
 		# Lift result to the original space
 		view(X,Ny+1:Ny+Nx,:) .+= Dx*V*(Xbrevepert*HXbrevepert')*b̆
 
+
 		# Filter state
 		if algo.isfiltered == true
 			@inbounds for i=1:Ne
@@ -220,8 +225,11 @@ function adaptive_lowrankenkf_symmetric_vortexassim(algo::LREnKF, X, tspan::Tupl
 			end
 		end
 
+    push!(Cx_history,copy(Cx))
+    push!(Cy_history,copy(Cy))
+
 		push!(Xa, deepcopy(state(X, Ny, Nx)))
 	end
 
-	return Xf, Xa, rxhist, ryhist
+	return Xf, Xa, rxhist, ryhist, Cx_history, Cy_history
 end
