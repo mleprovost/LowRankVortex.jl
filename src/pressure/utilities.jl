@@ -15,43 +15,61 @@ abstract type NoWall <: ImageType end
 
 const EPSILON_DEFAULT = 0.01
 
-Fvd(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = complexpotential(z,Vortex.Blob(zv,1.0,ϵ))
-_Fvi(z,zv,::Type{NoWall}) = complex(0.0)
-_Fvi(z,zv,::Type{Cylinder}) = -0.5im/π*(-log(z-1/conj(zv)) + log(z))
+Fvd(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _Fvd(z,zv,ϵ)
 Fvi(z,zv;walltype=NoWall) = _Fvi(z,zv,walltype)
-Fv(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = Fvd(z,zv) + _Fvi(z,zv,walltype)
-wvd(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = -0.5im/π*conj(z-zv)/(abs2(z-zv)+ϵ^2)
-_wvi(z,zv,::Type{NoWall}) = complex(0.0)
-_wvi(z,zv,::Type{Cylinder}) = -0.5im/π*(-1/(z-1/conj(zv)) + 1/z)
+Fv(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = _Fvd(z,zv,ϵ) + _Fvi(z,zv,walltype)
+_Fvd(z,zv,ϵ) = complexpotential(z,Vortex.Blob(zv,1.0,ϵ))
+_Fvi(z,zv,::Type{NoWall}) = complex(0.0)
+_Fvi(z,zv,::Type{FlatWall}) = -_Fvd(z,conj(zv),0.0)
+_Fvi(z,zv,::Type{Cylinder}) = -0.5im/π*(-log(z-1/conj(zv)) + log(z))
+
+wvd(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _wvd(z,zv,ϵ)
 wvi(z,zv;walltype=NoWall,kwargs...) = _wvi(z,zv,walltype)
-wv(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = wvd(z,zv;ϵ=ϵ) + _wvi(z,zv,walltype)
+wv(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = _wvd(z,zv,ϵ) + _wvi(z,zv,walltype)
+_wvd(z,zv,ϵ) = conj(induce_velocity(z,Vortex.Blob(zv,1.0,ϵ),0.0))
+_wvi(z,zv,::Type{NoWall}) = complex(0.0)
+_wvi(z,zv,::Type{FlatWall}) = -_wvd(z,conj(zv),0.0)
+_wvi(z,zv,::Type{Cylinder}) = -0.5im/π*(-1/(z-1/conj(zv)) + 1/z)
 
-dwvddz(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = 0.5im*conj(z-zv)^2/π/(abs2(z-zv) + ϵ^2)^2
-dwvddzstar(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = -0.5im*ϵ^2/π/(abs2(z-zv) + ϵ^2)^2
-_dwvidz(z,zv,::Type{NoWall}) = complex(0.0)
-_dwvidz(z,zv,::Type{Cylinder}) = -0.5im/π*(1/(z-1/conj(zv))^2-1/z^2)
+dwvddz(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _dwvddz(z,zv,ϵ)
+dwvddzstar(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _dwvddzstar(z,zv,ϵ)
 dwvidz(z,zv;walltype=NoWall,kwargs...) = _dwvidz(z,zv,walltype)
-dwvdz(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = dwvddz(z,zv;ϵ=ϵ) + _dwvidz(z,zv,walltype)
+dwvdz(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = _dwvddz(z,zv,ϵ) + _dwvidz(z,zv,walltype)
+_dwvddz(z,zv,ϵ) = 0.5im*conj(z-zv)^2/π/(abs2(z-zv) + ϵ^2)^2
+_dwvddzstar(z,zv,ϵ) = -0.5im*ϵ^2/π/(abs2(z-zv) + ϵ^2)^2
+_dwvidz(z,zv,::Type{NoWall}) = complex(0.0)
+_dwvidz(z,zv,::Type{FlatWall}) = -_dwvddz(z,conj(zv),0.0)
+_dwvidz(z,zv,::Type{Cylinder}) = -0.5im/π*(1/(z-1/conj(zv))^2-1/z^2)
 
-dwvddzv(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = -dwvddz(z,zv;ϵ=ϵ)
-dwvddzvstar(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = -dwvddzstar(z,zv;ϵ=ϵ)
-_dwvidzvstar(z,zv,::Type{NoWall}) = complex(0.0)
-_dwvidzvstar(z,zv,::Type{Cylinder}) = -0.5im/π/conj(zv)^2/(z-1/conj(zv))^2
+
+dwvddzv(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _dwvddzv(z,zv,ϵ)
+dwvddzvstar(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _dwvddzvstar(z,zv,ϵ)
 dwvidzvstar(z,zv;walltype=NoWall,kwargs...) = _dwvidzvstar(z,zv,walltype)
-dwvdzvstar(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = dwvddzvstar(z,zv;ϵ=ϵ) + _dwvidzvstar(z,zv,walltype)
+dwvdzvstar(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = _dwvddzvstar(z,zv,ϵ) + _dwvidzvstar(z,zv,walltype)
+_dwvddzv(z,zv,ϵ) = -_dwvddz(z,zv,ϵ)
+_dwvddzvstar(z,zv,ϵ) = -_dwvddzstar(z,zv,ϵ)
+_dwvidzvstar(z,zv,::Type{NoWall}) = complex(0.0)
+_dwvidzvstar(z,zv,::Type{FlatWall}) = -_dwvddzv(z,conj(zv),0.0)
+_dwvidzvstar(z,zv,::Type{Cylinder}) = -0.5im/π/conj(zv)^2/(z-1/conj(zv))^2
 
-dFddzv(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = -wvd(z,zv;ϵ=ϵ)
-_dFidzvstar(z,zv,::Type{NoWall}) = complex(0.0)
-_dFidzvstar(z,zv,::Type{Cylinder}) = 0.5im/π/conj(zv)^2/(z-1/conj(zv))
+
+dFddzv(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _dFddzv(z,zv,ϵ)
 dFidzvstar(z,zv;walltype=NoWall,kwargs...) = _dFidzvstar(z,zv,walltype)
-dFdzv(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = dFddzv(z,zv;ϵ=ϵ) + conj(_dFidzvstar(z,zv,walltype))
+dFdzv(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = _dFddzv(z,zv,ϵ) + conj(_dFidzvstar(z,zv,walltype))
+_dFddzv(z,zv,ϵ) = -_wvd(z,zv,ϵ)
+_dFidzvstar(z,zv,::Type{NoWall}) = complex(0.0)
+_dFidzvstar(z,zv,::Type{FlatWall}) = -_dFddzv(z,conj(zv),0.0)
+_dFidzvstar(z,zv,::Type{Cylinder}) = 0.5im/π/conj(zv)^2/(z-1/conj(zv))
 
-d2Fddzv2(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = dwvddz(z,zv;ϵ=ϵ)
-d2Fddzvdvzstar(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = dwvddzstar(z,zv;ϵ=ϵ)
-_d2Fidzvstar2(z,zv,::Type{NoWall}) = complex(0.0)
-_d2Fidzvstar2(z,zv,::Type{Cylinder}) = -0.5im/π/conj(zv)^3/(z-1/conj(zv))*(2 + 1/conj(zv)/(z-1/conj(zv)))
+d2Fddzv2(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _d2Fddzv2(z,zv,ϵ)
+d2Fddzvdvzstar(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _d2Fddzvdvzstar(z,zv,ϵ)
 d2Fidzvstar2(z,zv;walltype=NoWall,kwargs...) = _d2Fidzvstar2(z,zv,walltype)
-d2Fdzv2(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = d2Fddzv2(z,zv;ϵ=ϵ) + conj(_d2Fidzvstar2(z,zv,walltype))
+d2Fdzv2(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = _d2Fddzv2(z,zv,ϵ) + conj(_d2Fidzvstar2(z,zv,walltype))
+_d2Fddzv2(z,zv,ϵ) = _dwvddz(z,zv,ϵ)
+_d2Fddzvdvzstar(z,zv,ϵ) = _dwvddzstar(z,zv,ϵ)
+_d2Fidzvstar2(z,zv,::Type{NoWall}) = complex(0.0)
+_d2Fidzvstar2(z,zv,::Type{FlatWall}) = -_d2Fddzv2(z,conj(zv),0.0)
+_d2Fidzvstar2(z,zv,::Type{Cylinder}) = -0.5im/π/conj(zv)^3/(z-1/conj(zv))*(2 + 1/conj(zv)/(z-1/conj(zv)))
 
 
 P(z,zv;kwargs...) = abs2(wv(z,zv;kwargs...)) + 2real(dFdzv(z,zv;kwargs...)*conj(wvi(zv,zv;kwargs...)))
