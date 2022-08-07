@@ -1,6 +1,12 @@
 export VortexConfig, state_to_lagrange, lagrange_to_state
 
 
+abstract type ImageType end
+abstract type Cylinder <: ImageType end
+abstract type FlatWall <: ImageType end
+abstract type NoWall <: ImageType end
+
+
 """
     VortexConfig
 
@@ -22,7 +28,7 @@ A structure to hold the parameters of the vortex simulations
 
 - `advect_flag::Bool`: true if the vortex system should be advected
 """
-struct VortexConfig
+struct VortexConfig{walltype}
 
     "Number of vortices"
     Nv::Int64
@@ -53,9 +59,12 @@ struct VortexConfig
 
     "Advect flag"
     advect_flag::Bool
+
 end
 
-VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY) = VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,true)
+VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY) = VortexConfig{NoWall}(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,true)
+VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,advect_flag,walltype) = VortexConfig{walltype}(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,advect_flag)
+
 
 "A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).
  Use `lagrange_to_state` for the inverse transformation."

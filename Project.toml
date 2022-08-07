@@ -12,6 +12,8 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NamedColors = "51fcb6bd-ecd8-522c-95bc-4099d1d03463"
 PotentialFlow = "73af2aaf-3f58-5b29-82a9-435ecf827f5b"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TransportBasedInference = "bdf749b0-1400-4207-80d3-e689c0e3f03d"
 
