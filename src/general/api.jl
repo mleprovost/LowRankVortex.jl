@@ -64,8 +64,8 @@ end
 """
         adaptive_lowrank_enkf!(X,Σx,sens,Σϵ,ystar,h,jacob!)
 """
-function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h,jacob!,sens,config::VortexConfig; linear_flag=true) where {Nx,Ne}
-    additive_inflation!(X,Σx)
+function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h,jacob!,sens,config::VortexConfig; crit_ratio = 1.0, inflate=true,linear_flag=true) where {Nx,Ne}
+    inflate && additive_inflation!(X,Σx)
     observations!(Y,X,h,sens,config)
     ϵ = create_ensemble(Ne,zeros(length(sens)),Σϵ)
 
@@ -87,20 +87,21 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
         Vr = F.V[:,1:rx]
         Ur = F.U[:,1:ry]
         Λ = Diagonal(F.S[1:rx])
+        Λx = Λ^2
+        Λy = copy(Λx)
     else
         # calculate Jacobian and its transformed version
         Cx, Cy = gramians(jacob!, sens, Σϵ, X, Σx, config)
-        push!(Cxhist,copy(Cx))
-        push!(Cyhist,copy(Cy))
+
         V, Λx, _ = svd(Symmetric(Cx))  # Λx = Λ^2
         U, Λy, _ = svd(Symmetric(Cy))  # Λy = Λ^2
 
         # find reduced rank
         rx = size(Cx,1)
-        #rx = findfirst(x-> x >= crit_ratio, cumsum(Λx)./sum(Λx))
+        rx = findfirst(x-> x >= crit_ratio, cumsum(Λx)./sum(Λx))
 
         ry = size(Cy,1)
-        #ry = findfirst(x-> x >= crit_ratio, cumsum(Λy)./sum(Λy))
+        ry = findfirst(x-> x >= crit_ratio, cumsum(Λy)./sum(Λy))
 
         # rank reduction
         Vr = V[:,1:rx]
@@ -114,15 +115,18 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
     #Y̆ = Ur'*whiten(innov, Σϵ)
 
     # perform the update
-    if Ne == 1
+    if Ne == 1 && linear_flag
         ΣY̆ = Λ^2+I
         ΣX̆Y̆ = Λ
         #K̃ = Λ*inv(Λ^2+I)
         #K̃ = ΣX̆Y̆*inv(ΣY̆)
     else
-        X̆p = ensemble_perturb(Vr'*whiten(X,Σx))
-        HX̆p = ensemble_perturb(Ur'*whiten(Y,Σϵ))
-        ϵ̆p = ensemble_perturb(Ur'*whiten(ϵ,Σϵ))
+        #X̆p = ensemble_perturb(Vr'*whiten(X,Σx))
+        #HX̆p = ensemble_perturb(Ur'*whiten(Y,Σϵ))
+        #ϵ̆p = ensemble_perturb(Ur'*whiten(ϵ,Σϵ))
+        X̆p = Vr'*inv(sqrt(Σx))*X
+        HX̆p = Ur'*inv(sqrt(Σϵ))*Y
+        ϵ̆p = Ur'*inv(sqrt(Σϵ))*ϵ
 
         ΣY̆ = cov(HX̆p) + cov(ϵ̆p)  # should be analogous to Λ^2 + I
         ΣX̆Y̆ = cov(X̆p,HX̆p) # should be analogous to Λ
@@ -131,5 +135,5 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
 
     yerr = norm(mean(innov))/norm(mean(ystar+ϵ))
 
-    return Vr, Ur, rx, ry, Y̆, yerr
+    return Vr, Ur, Λx, Λy, rx, ry, Y̆, ΣY̆, ΣX̆Y̆, yerr
 end
