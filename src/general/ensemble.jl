@@ -66,8 +66,12 @@ for op in (:+, :-, :*)
     end
 end
 
-(-)(X::BasicEnsembleMatrix,a::AbstractVector) = BasicEnsembleMatrix(X.X.-a)
-(-)(a::AbstractVector,X::BasicEnsembleMatrix) = BasicEnsembleMatrix(a.-X.X)
+for op in (:+, :-)
+  #@eval ($op)(X::BasicEnsembleMatrix,a::AbstractVector) = BasicEnsembleMatrix($op(X.X,a))
+  #@eval ($op)(a::AbstractVector,X::BasicEnsembleMatrix) = BasicEnsembleMatrix($op(a,X.X))
+  @eval ($op)(X::BasicEnsembleMatrix,a::AbstractVector) = Base.broadcast($op,X,a)
+  @eval ($op)(a::AbstractVector,X::BasicEnsembleMatrix) = Base.broadcast($op,a,X)
+end
 
 for op in (:*, :\)
   for t in (:Diagonal, :UniformScaling, :Matrix, :Adjoint)
