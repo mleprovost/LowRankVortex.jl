@@ -1,4 +1,4 @@
-export gramians, observations!, adaptive_lowrank_enkf!
+export gramians, observations!, adaptive_lowrank_enkf!, LowRankENKFSolution
 
 pressure(z,v,config::VortexConfig{WT}) where {WT} =
     pressure(z,v;ϵ=config.δ,walltype=WT)
@@ -6,6 +6,21 @@ pressure(z,v,config::VortexConfig{WT}) where {WT} =
 analytical_pressure_jacobian!(J,target,source,config::VortexConfig{WT}) where {WT} =
     analytical_pressure_jacobian!(J,target,source;ϵ=config.δ,walltype=WT)
 
+
+struct LowRankENKFSolution{XT,YT,SYT,SXYT}
+   X :: XT
+   crit_ratio :: Float64
+   V :: Matrix{Float64}
+   U :: Matrix{Float64}
+   Λx :: Vector{Float64}
+   Λy :: Vector{Float64}
+   rx :: Int64
+   ry :: Int64
+   Y̆ :: YT
+   ΣY̆ :: SYT
+   ΣX̆Y̆ :: SXYT
+   yerr :: Float64
+end
 
 """
     gramians(jacob!,sens,Σϵ,X,Σx,config) -> Matrix, Matrix
@@ -24,6 +39,8 @@ function gramians(jacob!,sens::AbstractVector,Σϵ,X::EnsembleMatrix{Nx,Ne},Σx,
     Dx = sqrt(Σx)
 
     fact = min(1.0,1.0/(Ne-1)) # why isn't this just 1/Ne? it's a first-order statistic
+    #fact = min(1.0,1.0/Ne) # why isn't this just 1/Ne? it's a first-order statistic
+
     for j in 1:Ne
 
         # the next two lines should be combined into one step
@@ -33,10 +50,10 @@ function gramians(jacob!,sens::AbstractVector,Σϵ,X::EnsembleMatrix{Nx,Ne},Σx,
 
         H̃ = invDϵ*H*Dx
 
-        Cx .+= fact*H̃'*H̃
-        Cy .+= fact*H̃*H̃'
+        Cx .+= H̃'*H̃
+        Cy .+= H̃*H̃'
     end
-    return Cx, Cy
+    return fact*Cx, fact*Cy
 end
 
 """
@@ -135,5 +152,7 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
 
     yerr = norm(mean(innov))/norm(mean(ystar+ϵ))
 
-    return Vr, Ur, Λx, Λy, rx, ry, Y̆, ΣY̆, ΣX̆Y̆, yerr
+    soln = LowRankENKFSolution(X,crit_ratio,V,U,Λx,Λy,rx,ry,Y̆,ΣY̆,ΣX̆Y̆,yerr)
+
+    return soln
 end
