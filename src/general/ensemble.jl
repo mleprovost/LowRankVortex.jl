@@ -1,7 +1,7 @@
 import Base: *, +, -, \, size, length, getindex, eltype,similar
 
 export BasicEnsembleMatrix, create_ensemble, ensemble_perturb, whiten,
-        additive_inflation!
+        additive_inflation!, multiplicative_inflation!
 
 abstract type EnsembleMatrix{Nx,Ne,T} <: AbstractMatrix{T} end
 
@@ -106,6 +106,17 @@ zero mean and variance given by `Σx`.
 """
 function additive_inflation!(X::BasicEnsembleMatrix{Nx,Ne},Σx::Union{UniformScaling,AbstractMatrix}) where {Nx,Ne}
     X .+= create_ensemble(Ne,zeros(Float64,Nx),Σx)
+    return X
+end
+
+"""
+    multiplicative_inflation!(X::BasicEnsembleMatrix,β)
+
+Carry out the operation ``\\bar{x} + \\beta(x^j - \\bar{x})`` for every ensemble
+member in `X` (in place).
+"""
+function multiplicative_inflation!(X::BasicEnsembleMatrix{Nx,Ne},β) where {Nx,Ne}
+    X .= mean(X) + β*ensemble_perturb(X)
     return X
 end
 

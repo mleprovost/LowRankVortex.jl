@@ -7,8 +7,9 @@ analytical_pressure_jacobian!(J,target,source,config::VortexConfig{WT}) where {W
     analytical_pressure_jacobian!(J,target,source;ϵ=config.δ,walltype=WT)
 
 
-struct LowRankENKFSolution{XT,YT,SYT,SXYT}
+struct LowRankENKFSolution{XT,YT,SIGXT,SIGYT,SYT,SXYT}
    X :: XT
+   Xf :: XT
    crit_ratio :: Float64
    V :: Matrix{Float64}
    U :: Matrix{Float64}
@@ -16,6 +17,8 @@ struct LowRankENKFSolution{XT,YT,SYT,SXYT}
    Λy :: Vector{Float64}
    rx :: Int64
    ry :: Int64
+   Σx :: SIGXT
+   Σy :: SIGYT
    Y̆ :: YT
    ΣY̆ :: SYT
    ΣX̆Y̆ :: SXYT
@@ -81,10 +84,12 @@ end
 """
         adaptive_lowrank_enkf!(X,Σx,sens,Σϵ,ystar,h,jacob!)
 """
-function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h,jacob!,sens,config::VortexConfig; crit_ratio = 1.0, inflate=true,linear_flag=true) where {Nx,Ne}
+function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h,jacob!,sens,config::VortexConfig; rxdefault = Nx, rydefault = length(sens), crit_ratio = 1.0, inflate=true,β=1.0,linear_flag=true) where {Nx,Ne}
     inflate && additive_inflation!(X,Σx)
+    inflate && multiplicative_inflation!(X,β)
     observations!(Y,X,h,sens,config)
     ϵ = create_ensemble(Ne,zeros(length(sens)),Σϵ)
+    Xf = deepcopy(X)
 
     if Ne == 1 && linear_flag
         H = zeros(Float64,length(sens),size(X,1))
@@ -101,8 +106,10 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
         rx = size(X,1)
         ry = rx
 
-        Vr = F.V[:,1:rx]
-        Ur = F.U[:,1:ry]
+        V = F.V
+        U = F.U
+        Vr = V[:,1:rx]
+        Ur = U[:,1:ry]
         Λ = Diagonal(F.S[1:rx])
         Λx = Λ^2
         Λy = copy(Λx)
@@ -114,11 +121,9 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
         U, Λy, _ = svd(Symmetric(Cy))  # Λy = Λ^2
 
         # find reduced rank
-        rx = size(Cx,1)
-        rx = findfirst(x-> x >= crit_ratio, cumsum(Λx)./sum(Λx))
+        rx = crit_ratio < 1.0 ? findfirst(x-> x >= crit_ratio, cumsum(Λx)./sum(Λx)) : rxdefault
 
-        ry = size(Cy,1)
-        ry = findfirst(x-> x >= crit_ratio, cumsum(Λy)./sum(Λy))
+        ry = crit_ratio < 1.0 ? findfirst(x-> x >= crit_ratio, cumsum(Λy)./sum(Λy)) : rydefault
 
         # rank reduction
         Vr = V[:,1:rx]
@@ -152,7 +157,7 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
 
     yerr = norm(mean(innov))/norm(mean(ystar+ϵ))
 
-    soln = LowRankENKFSolution(X,crit_ratio,V,U,Λx,Λy,rx,ry,Y̆,ΣY̆,ΣX̆Y̆,yerr)
+    soln = LowRankENKFSolution(X,Xf,crit_ratio,V,U,Λx,Λy,rx,ry,Σx,Σϵ,Y̆,ΣY̆,ΣX̆Y̆,yerr)
 
     return soln
 end

@@ -1,14 +1,233 @@
+using RecipesBase
+using ColorTypes
+
 export color_palette
+
+setmarkersize(x::Float64) = 5 + x*4
 
 """
 A palette of colors for plotting
 """
 const color_palette = [colorant"firebrick";
-                       colorant"orangered2";
+                       colorant"seagreen4";
                        colorant"goldenrod1";
                        colorant"skyblue1";
                        colorant"slateblue";
                        colorant"maroon3";
+                       colorant"orangered2";
                        colorant"grey70";
-                       colorant"dodgerblue4";
-                       colorant"seagreen4"]
+                       colorant"dodgerblue4"]
+
+@userplot Filtertrajectory
+
+@recipe function f(h::Filtertrajectory)
+
+  solhist, sens, xtrue = h.args
+  Nv = size(solhist[1].X,1) ÷ 3
+
+  Nv_true = length(xtrue) ÷ 3
+
+  truex = xtrue[1:2:2Nv_true]
+  truey = xtrue[2:2:2Nv_true]
+  trueΓ = xtrue[2Nv_true+1:3Nv_true]
+
+  ratio := 1
+  @series begin
+    seriestype := :scatter
+    markersize --> 5
+    markerstrokecolor --> :black
+    markercolor --> :white
+    label := "true"
+    truex, truey
+  end
+
+  @series begin
+    seriestype := :scatter
+    markersize --> 2
+    markercolor --> :blue
+    label := "sensor"
+    real.(sens), imag.(sens)
+  end
+
+  #col = theme_palette(:auto)
+  for j in 1:Nv
+    xj = map(x -> mean(x.Xf)[2j-1],solhist)
+    yj = map(x -> mean(x.Xf)[2j],solhist);
+    @series begin
+      seriestype := :path
+      label := "traj of "*string(j)
+      color := color_palette[j]
+      xj, yj
+    end
+    @series begin
+      seriestype := :scatter
+      markershape := :diamond
+      label := "prior of"*string(j)
+      markercolor := color_palette[j]
+      [xj[1]], [yj[1]]
+    end
+    @series begin
+      seriestype := :scatter
+      markershape := :star
+      label := "post of"*string(j)
+      markercolor := color_palette[j]
+      [xj[end]], [yj[end]]
+    end
+  end
+
+end
+
+@userplot Filterstepplot
+
+@recipe function f(h::Filterstepplot;arrows_on = true,ubarscale=1,vbarscale=1)
+  jdex, solhist, xtrue = h.args
+  Nv = size(solhist[1].X,1) ÷ 3
+
+  Nv_true = length(xtrue) ÷ 3
+
+  truex = xtrue[1:2:2Nv_true]
+  truey = xtrue[2:2:2Nv_true]
+  trueΓ = xtrue[2Nv_true+1:3Nv_true]
+
+  sol = solhist[jdex]
+  Y̆mean = mean(sol.Y̆)
+  ucoeff_j = Y̆mean
+  vcoeff_j = sol.ΣX̆Y̆*(sol.ΣY̆\Y̆mean)
+  dx_j = sqrt(sol.Σx)*sol.V[:,1:sol.rx]*vcoeff_j
+
+  Xfmean = mean(sol.Xf)
+  xjf = Xfmean[1:2:2Nv]
+  yjf = Xfmean[2:2:2Nv]
+
+  Xamean = mean(sol.X)
+  xja = Xamean[1:2:2Nv]
+  yja = Xamean[2:2:2Nv]
+
+  l = @layout [a{0.25w} b c{0.25w}]
+
+  layout := l
+  size --> (700,700)
+  @series begin
+    subplot := 1
+    xlims := (0.5,length(ucoeff_j)+0.5)
+    ylims := (-500*ubarscale,500*ubarscale)
+    seriestype := :bar
+    xlabel := "u mode"
+    legend := :false
+    barwidths --> 0.5
+    ucoeff_j
+  end
+
+
+
+  @series begin
+    subplot := 2
+    seriestype := :scatter
+    markersize := setmarkersize.(dx_j[2Nv+1:3Nv])
+    markershape := :star
+    markercolor := :gray
+    xja, yja
+  end
+
+
+
+  if arrows_on
+    @series begin
+      subplot := 2
+      seriestype := :scatter
+      markersize := 5
+      markershape := :diamond
+      markercolor := color_palette[1]
+      xjf, yjf
+    end
+    @series begin
+      subplot := 2
+      seriestype := :quiver
+        quiver := (10*dx_j[1:2:2Nv],10*dx_j[2:2:2Nv])
+        color := :black
+        xjf, yjf
+      end
+  end
+
+  @series begin
+    subplot := 2
+    seriestype := :scatter
+    ratio := 1
+    legend := :false
+    markersize := 3
+    markercolor := :black
+    truex, truey
+  end
+
+  @series begin
+    subplot := 3
+    seriestype := :bar
+    xlims := (0.5,length(vcoeff_j)+0.5)
+    ylims := (-100*vbarscale,100*vbarscale)
+    xlabel := "v mode"
+    legend := :false
+    barwidths --> 0.5
+    vcoeff_j
+  end
+
+end
+
+@userplot Showmode
+
+@recipe function f(h::Showmode)
+    jdex, mode, solhist = h.args
+    Nv = size(solhist[1].X,1) ÷ 3
+
+    sol = solhist[jdex]
+    V = sol.V
+    U = sol.U
+    lenU = size(U,1)
+    Y̆mean = mean(sol.Y̆)
+
+    Xfmean = mean(sol.Xf)
+    xjf = Xfmean[1:2:2Nv]
+    yjf = Xfmean[2:2:2Nv]
+
+    layout := @layout [a{0.5w} b{0.5w}]
+
+    @series begin
+      subplot := 2
+      seriestype := :scatter
+      markersize := setmarkersize.(V[2Nv+1:3Nv,mode])
+      markercolor := :gray
+      xjf.+V[1:2:2Nv,mode], yjf.+V[2:2:2Nv,mode]
+    end
+    @series begin
+      subplot := 2
+      seriestype := :scatter
+      markersize := 5
+      xjf, yjf
+    end
+    @series begin
+      subplot := 2
+      seriestype := :quiver
+      quiver := (V[1:2:2Nv,mode],V[2:2:2Nv,mode])
+      ratio := 1
+      legend := :false
+      color := :black
+      xjf, yjf
+      end
+
+      @series begin
+        subplot := 1
+        legend := :false
+        xlabel --> "sensor no."
+        xlims := (0,Inf)
+        ylims := (-5/sqrt(lenU),5/sqrt(lenU))
+        U[:,mode]
+      end
+
+    #=
+    p1 = scatter(real.(zv_j).+V[1:2:2Nv,mode],imag.(zv_j).+V[2:2:2Nv,mode],markersize=setmarkersize.(V[2Nv+1:3Nv,mode]),legend=false,markercolor=:gray)
+scatter!(p1,real.(zv_j),imag.(zv_j),markersize=5)
+quiver!(p1,real.(zv_j),imag.(zv_j),quiver=(V[1:2:2Nv,mode],V[2:2:2Nv,mode]),ratio=1,legend=:false,color=:black,xlim=(-1.5,1.5),ylim=(-1.5,1.5),size=(300,300))
+p2 = plot(U[:,mode],legend=false,size=(800,250))
+p3 = plot(p1,p2)
+    =#
+
+end
