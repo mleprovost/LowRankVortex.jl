@@ -1,5 +1,9 @@
 import Base: *, +, -, \, size, length, getindex, eltype,similar
 
+import Statistics: cov, mean, std, var
+
+import LinearAlgebra: norm
+
 export BasicEnsembleMatrix, create_ensemble, ensemble_perturb, whiten,
         additive_inflation!, multiplicative_inflation!
 
@@ -97,6 +101,20 @@ _ensemble_cov(X::AbstractMatrix,Y::AbstractMatrix) = cov(X,Y,dims=2,corrected=tr
 Remove the mean from the ensemble data in `X` and left-multiply each member by ``Σ_x^{-1/2}``
 """
 whiten(X::BasicEnsembleMatrix,Σx::Union{UniformScaling,AbstractMatrix}) = inv(sqrt(Σx))*ensemble_perturb(X)
+
+
+"""
+    norm(X::BasicEnsembleMatrix,Σx)
+
+Calculate ``||x||_{\\Sigma^{-1}_x} = \\sqrt{x^T {\\Sigma^{-1}_x} x}``
+"""
+function norm(X::BasicEnsembleMatrix,Σx::Union{UniformScaling,AbstractMatrix})
+  out = 0.0
+  for x in X
+    out += norm(inv(sqrt(Σx))*x)^2
+  end
+  return sqrt(out/size(X,2))
+end
 
 """
     additive_inflation!(X::BasicEnsembleMatrix,Σx)

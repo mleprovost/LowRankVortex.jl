@@ -193,25 +193,33 @@ end
     @series begin
       subplot := 2
       seriestype := :scatter
-      markersize := setmarkersize.(V[2Nv+1:3Nv,mode])
-      markercolor := :gray
-      xjf.+V[1:2:2Nv,mode], yjf.+V[2:2:2Nv,mode]
-    end
-    @series begin
-      subplot := 2
-      seriestype := :scatter
+      markercolor := :white
       markersize := 5
       xjf, yjf
     end
-    @series begin
-      subplot := 2
-      seriestype := :quiver
-      quiver := (V[1:2:2Nv,mode],V[2:2:2Nv,mode])
-      ratio := 1
-      legend := :false
-      color := :black
-      xjf, yjf
+
+
+
+      @series begin
+        subplot := 2
+        seriestype := :scatter
+        #markersize := setmarkersize.(V[2Nv+1:3Nv,mode])
+        markersize := 5
+        markercolor := :RdBu_4
+        marker_z := V[2Nv+1:3Nv,mode]
+        xjf.+V[1:2:2Nv,mode], yjf.+V[2:2:2Nv,mode]
       end
+
+      @series begin
+        subplot := 2
+        seriestype := :quiver
+        quiver := (V[1:2:2Nv,mode],V[2:2:2Nv,mode])
+        ratio := 1
+        legend := :false
+        clims := (-1,1)
+        color := :black
+        xjf, yjf
+        end
 
       @series begin
         subplot := 1

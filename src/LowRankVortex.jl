@@ -10,7 +10,6 @@ import PotentialFlow.Blobs
 import PotentialFlow.Elements
 using ProgressMeter
 using Statistics
-import Statistics: cov, mean, std, var
 using TransportBasedInference
 using NamedColors
 using StaticArrays
@@ -40,6 +39,7 @@ include("general/pressure_utilities.jl")
 include("general/state_utilities.jl")
 include("general/jacobian.jl")
 include("general/ensemble.jl")
+include("general/vortex.jl")
 include("general/api.jl")
 
 

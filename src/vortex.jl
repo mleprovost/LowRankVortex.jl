@@ -62,8 +62,11 @@ struct VortexConfig{walltype}
 
 end
 
-VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY) = VortexConfig{NoWall}(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,true)
-VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,advect_flag,walltype) = VortexConfig{walltype}(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,advect_flag)
+VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY;advect_flag=true,walltype=NoWall) = VortexConfig{walltype}(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,advect_flag)
+VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY;advect_flag=true,walltype=NoWall) = VortexConfig{walltype}(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,advect_flag)
+
+VortexConfig(Nv,δ;walltype=NoWall) = VortexConfig{walltype}(Nv,complex(0.0),ComplexF64[],0.0,δ,0.0,0.0,0.0,0.0,false)
+VortexConfig(Nv,U,Δt,δ;advect_flag=true,walltype=NoWall) = VortexConfig{walltype}(Nv,U,ComplexF64[],Δt,δ,0.0,0.0,0.0,0.0,advect_flag)
 
 
 "A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).

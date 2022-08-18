@@ -146,16 +146,21 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
         #X̆p = ensemble_perturb(Vr'*whiten(X,Σx))
         #HX̆p = ensemble_perturb(Ur'*whiten(Y,Σϵ))
         #ϵ̆p = ensemble_perturb(Ur'*whiten(ϵ,Σϵ))
-        X̆p = Vr'*inv(sqrt(Σx))*X
-        HX̆p = Ur'*inv(sqrt(Σϵ))*Y
-        ϵ̆p = Ur'*inv(sqrt(Σϵ))*ϵ
+        X̆p = Vr'*whiten(X,Σx)
+        HX̆p = Ur'*whiten(Y,Σϵ)
+        ϵ̆p = Ur'*whiten(ϵ,Σϵ)
+        #X̆p = Vr'*inv(sqrt(Σx))*X
+        #HX̆p = Ur'*inv(sqrt(Σϵ))*Y
+        #ϵ̆p = Ur'*inv(sqrt(Σϵ))*ϵ
 
         ΣY̆ = cov(HX̆p) + cov(ϵ̆p)  # should be analogous to Λ^2 + I
         ΣX̆Y̆ = cov(X̆p,HX̆p) # should be analogous to Λ
     end
     X .+= sqrt(Σx)*Vr*ΣX̆Y̆*(ΣY̆\Y̆)
 
-    yerr = norm(mean(innov))/norm(mean(ystar+ϵ))
+    #yerr = norm(mean(ystar - Y))/norm(mean(ystar))
+    yerr = norm(inv(sqrt(Σϵ))*(ystar-mean(Y)))
+    #yerr = norm(ystar-Y,Σϵ)
 
     soln = LowRankENKFSolution(X,Xf,crit_ratio,V,U,Λx,Λy,rx,ry,Σx,Σϵ,Y̆,ΣY̆,ΣX̆Y̆,yerr)
 
