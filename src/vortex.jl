@@ -28,16 +28,19 @@ A structure to hold the parameters of the vortex simulations
 
 - `advect_flag::Bool`: true if the vortex system should be advected
 """
-struct VortexConfig{walltype}
+struct VortexConfig{BT,ST}
 
     "Number of vortices"
     Nv::Int64
+
+    "Body"
+    body::BT
 
     "Freestream velocity"
     U::ComplexF64
 
     "Sensor locations"
-    ss::Array{ComplexF64,1}
+    ss::ST
 
     "Time step"
     Δt::Float64
@@ -62,11 +65,10 @@ struct VortexConfig{walltype}
 
 end
 
-VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY;advect_flag=true,walltype=NoWall) = VortexConfig{walltype}(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,advect_flag)
-VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY;advect_flag=true,walltype=NoWall) = VortexConfig{walltype}(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,advect_flag)
+VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY;advect_flag=true,body=nothing) = VortexConfig(Nv,body,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,advect_flag)
 
-VortexConfig(Nv,δ;walltype=NoWall) = VortexConfig{walltype}(Nv,complex(0.0),ComplexF64[],0.0,δ,0.0,0.0,0.0,0.0,false)
-VortexConfig(Nv,U,Δt,δ;advect_flag=true,walltype=NoWall) = VortexConfig{walltype}(Nv,U,ComplexF64[],Δt,δ,0.0,0.0,0.0,0.0,advect_flag)
+VortexConfig(Nv,δ;body=nothing) = VortexConfig(Nv,body,complex(0.0),ComplexF64[],0.0,δ,0.0,0.0,0.0,0.0,false)
+VortexConfig(Nv,U,Δt,δ;advect_flag=true,body=nothing) = VortexConfig(Nv,body,U,ComplexF64[],Δt,δ,0.0,0.0,0.0,0.0,advect_flag)
 
 
 "A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).

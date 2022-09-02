@@ -1,19 +1,52 @@
-export pressure, dpdzv, dpdΓv, strength
+export analytical_pressure, analytical_dpdzv, analytical_dpdΓv
 
 
 # A few helper routines
 strength(v::Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}) = v.S
 strength(v::Vector{T}) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(vj -> strength(vj),v)
 
+
+analytical_pressure(ζ,v::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where {T<:Element} = analytical_pressure(ζ,v,config.body;kwargs...)
+analytical_pressure(ζ,v::Vector{T},config::VortexConfig;kwargs...) where {T<:Element} = analytical_pressure(ζ,v;kwargs...)
+
+analytical_pressure(z,v::Vector{T},config::VortexConfig{DataType}) where {T<:Element} =
+    analytical_pressure(z,v;ϵ=config.δ,walltype=config.body)
+
+
+### For conformally mapped bodies
+
+# This function expects to get the evaluation points and vortex elements in the circle plane
+function analytical_pressure(ζ,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
+
+  return Bodies.pressure(ζ,v_ζ,b)
+
+end
+
+function analytical_dpdζv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
+
+  return Bodies.dpdζv(ζ,l,v_ζ,b)
+
+end
+
+function analytical_dpdzv(ζ,l::Integer,v::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
+
+  # map elements to circle plane
+  v_ζ = Elements.inverse_conftransform(v,b)
+  return Bodies.dpdzv(ζ,l,v_ζ,b)
+
+end
+
+function analytical_dpdΓv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
+
+  # map elements to circle plane
+  #v_ζ = Elements.inverse_conftransform(v,b)
+  return Bodies.dpdΓv(ζ,l,v_ζ,b)
+
+end
+
 ### Define the pressure and its gradients
 
-# Note that $\mathrm{d}p/\mathrm{d}z^* = (\mathrm{d}p/\mathrm{d}z)^*$.
-# To obtain the gradient of pressure with respect to the $x$ or $y$ position of vortex $l$, use
-# $$\frac{\partial p}{\partial x_l} = \frac{\mathrm{d}p}{\mathrm{d}z_l} + \frac{\mathrm{d}p}{\mathrm{d}z^*_l} = 2 \mathrm{Re} \frac{\mathrm{d}p}{\mathrm{d}z_l}$$
-# and
-# $$\frac{\partial p}{\partial y_l} = \mathrm{i}\frac{\mathrm{d}p}{\mathrm{d}z_l} - \mathrm{i} \frac{\mathrm{d}p}{\mathrm{d}z^*_l} = -2 \mathrm{Im} \frac{\mathrm{d}p}{\mathrm{d}z_l}$$
-
-function pressure(z,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}}
+function analytical_pressure(z,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}}
         out = 0.0
         for (j,vj) in enumerate(v)
             zj,Γj  = Elements.position(vj), strength(vj)
@@ -27,7 +60,7 @@ function pressure(z,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points
 end
 
 # Change of pressure with respect to change of strength of vortex l (specified by its index)
-function dpdΓv(z,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}}
+function analytical_dpdΓv(z,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}}
         zl,Γl  = Elements.position(v[l]), strength(v[l])
         out = -Γl*P(z,zl;kwargs...)
         for (k,vk) in enumerate(v)
@@ -39,7 +72,7 @@ function dpdΓv(z,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFl
 end
 
 # Change of pressure with respect to change of position of vortex l (specified by its index)
-function dpdzv(z,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}}
+function analytical_dpdzv(z,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}}
         zl,Γl  = Elements.position(v[l]), strength(v[l])
         out = -0.5*Γl*dPdzv(z,zl;kwargs...)
         for (k,vk) in enumerate(v)
@@ -50,10 +83,12 @@ function dpdzv(z,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlo
         return Γl*out
 end
 
-pressure(z::AbstractArray,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> pressure(zj,v;kwargs...),z)
-dpdzv(z::AbstractArray,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> dpdzv(zj,l,v;kwargs...),z)
-dpdΓv(z::AbstractArray,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> dpdΓv(zj,l,v;kwargs...),z)
+analytical_pressure(z::AbstractArray,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> analytical_pressure(zj,v;kwargs...),z)
+analytical_dpdzv(z::AbstractArray,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> analytical_dpdzv(zj,l,v;kwargs...),z)
+analytical_dpdΓv(z::AbstractArray,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> analytical_dpdΓv(zj,l,v;kwargs...),z)
 
+
+analytical_pressure(z,v,::Nothing;kwargs...) = analytical_pressure(z,v;kwargs...)
 
 # Define the functions that comprise the pressure and its gradients
 const EPSILON_DEFAULT = 0.01

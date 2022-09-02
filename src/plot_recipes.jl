@@ -22,14 +22,16 @@ const color_palette = [colorant"firebrick";
 
 @recipe function f(h::Filtertrajectory)
 
-  solhist, sens, xtrue = h.args
+  if length(h.args) > 3
+    solhist, sens, vort_true, b = h.args
+  else
+    solhist, sens, vort_true = h.args
+  end
   Nv = size(solhist[1].X,1) ÷ 3
+  truez = Elements.position(vort_true)
+  trueΓ = LowRankVortex.strength(vort_true)
 
-  Nv_true = length(xtrue) ÷ 3
-
-  truex = xtrue[1:2:2Nv_true]
-  truey = xtrue[2:2:2Nv_true]
-  trueΓ = xtrue[2Nv_true+1:3Nv_true]
+  true_center = vortexmoment(1,truez,trueΓ)
 
   ratio := 1
   @series begin
@@ -38,12 +40,31 @@ const color_palette = [colorant"firebrick";
     markerstrokecolor --> :black
     markercolor --> :white
     label := "true"
-    truex, truey
+    real(truez), imag(truez)
   end
+
+  if length(h.args) > 3
+    @series begin
+      label := "body"
+      b
+    end
+  end
+
+  #=
+  @series begin
+    seriestype := :scatter
+    markersize --> 5
+    markershape --> :utriangle
+    markerstrokecolor --> :black
+    markercolor --> :black
+    label := "true centroid"
+    [real(true_center)], [imag(true_center)]
+  end
+  =#
 
   @series begin
     seriestype := :scatter
-    markersize --> 2
+    markersize --> 5
     markercolor --> :blue
     label := "sensor"
     real.(sens), imag.(sens)
@@ -51,8 +72,13 @@ const color_palette = [colorant"firebrick";
 
   #col = theme_palette(:auto)
   for j in 1:Nv
-    xj = map(x -> mean(x.Xf)[2j-1],solhist)
-    yj = map(x -> mean(x.Xf)[2j],solhist);
+    #xj = map(x -> mean(x.Xf)[2j-1],solhist)
+    #yj = map(x -> mean(x.Xf)[2j],solhist)
+    rj = map(x -> mean(x.Xf)[j],solhist)
+    rΘj = map(x -> mean(x.Xf)[Nv+j],solhist)
+    ζj = rj.*exp.(im*rΘj./rj)
+    zj = Elements.conftransform(ζj,b)
+    xj, yj = real(zj), imag(zj)
     @series begin
       seriestype := :path
       label := "traj of "*string(j)
@@ -62,17 +88,18 @@ const color_palette = [colorant"firebrick";
     @series begin
       seriestype := :scatter
       markershape := :diamond
-      label := "prior of"*string(j)
+      label := "prior of "*string(j)
       markercolor := color_palette[j]
       [xj[1]], [yj[1]]
     end
     @series begin
       seriestype := :scatter
       markershape := :star
-      label := "post of"*string(j)
+      label := "post of "*string(j)
       markercolor := color_palette[j]
       [xj[end]], [yj[end]]
     end
+
   end
 
 end
@@ -225,7 +252,7 @@ end
         subplot := 1
         legend := :false
         xlabel --> "sensor no."
-        xlims := (0,Inf)
+        xlims := (1,lenU)
         ylims := (-5/sqrt(lenU),5/sqrt(lenU))
         U[:,mode]
       end

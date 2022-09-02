@@ -1,18 +1,12 @@
-export gramians, observations!, adaptive_lowrank_enkf!, LowRankENKFSolution
-
-pressure(z,v,config::VortexConfig{WT}) where {WT} =
-    pressure(z,v;ϵ=config.δ,walltype=WT)
-
-analytical_pressure_jacobian!(J,target,source,config::VortexConfig{WT}) where {WT} =
-    analytical_pressure_jacobian!(J,target,source;ϵ=config.δ,walltype=WT)
+export gramians, observations!, observations, adaptive_lowrank_enkf!, LowRankENKFSolution
 
 
 struct LowRankENKFSolution{XT,YT,SIGXT,SIGYT,SYT,SXYT}
    X :: XT
    Xf :: XT
    crit_ratio :: Float64
-   V :: Matrix{Float64}
-   U :: Matrix{Float64}
+   V :: AbstractMatrix{Float64}
+   U :: AbstractMatrix{Float64}
    Λx :: Vector{Float64}
    Λy :: Vector{Float64}
    rx :: Int64
@@ -60,9 +54,9 @@ function gramians(jacob!,sens::AbstractVector,Σϵ,X::EnsembleMatrix{Nx,Ne},Σx,
 end
 
 """
-    observations!(Y::EnsembleMatrix,X::EnsembleMatrix,h,sens,config) -> X
+    observations!(Y::EnsembleMatrix,X::EnsembleMatrix,h::Function,sens,config)
 
-Compute the observations `h` for each of the states in `X` and place them in `Y`.
+Compute the observation function `h` for each of the states in `X` and place them in `Y`.
 The function `h` should take as inputs a Ny-dimensional vector of measurement points (`sens`), a vector of vortices,
 and the configuration data `config`.
 """
@@ -71,13 +65,21 @@ function observations!(Y::EnsembleMatrix{Ny,Ne},X::EnsembleMatrix{Nx,Ne},h,sens:
     @assert length(sens) == Ny "Invalid length of sensor point vector"
 
     for j in 1:Ne
-
-        # The next two lines should be combined into one
-        # step that just takes in X(j) and returns Y(j)
-        vj = state_to_lagrange_reordered(X(j),config)
-        Y(j) .= h(sens,vj,config)
+        Y(j) .= observations(X(j),h,sens,config)
     end
-    return X
+    return Y
+end
+
+"""
+    observations(x::AbstractVector,h::Function,sens,config) -> X
+
+Compute the observation function `h` for state `x`.
+The function `h` should take as inputs a vector of measurement points (`sens`), a vector of vortices,
+and the configuration data `config`.
+"""
+function observations(x::AbstractVector,h,sens::AbstractVector,config::VortexConfig)
+  vj = state_to_lagrange_reordered(x,config)
+  return h(sens,vj,config)
 end
 
 
@@ -91,7 +93,13 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
     ϵ = create_ensemble(Ne,zeros(length(sens)),Σϵ)
     Xf = deepcopy(X)
 
-    if Ne == 1 && linear_flag
+    # Calculate error
+    #yerr = norm(mean(ystar - Y))/norm(mean(ystar))
+    #yerr = norm(inv(sqrt(Σϵ))*(ystar-mean(Y)))
+    yerr = norm(ystar-mean(Y),Σϵ)
+    #yerr = norm(ystar-Y+ϵ,Σϵ)
+
+    if Ne == 1 || linear_flag
         H = zeros(Float64,length(sens),size(X,1))
 
         # the next two lines should be combined into one step
@@ -111,11 +119,15 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
         Vr = V[:,1:rx]
         Ur = U[:,1:ry]
         Λ = Diagonal(F.S[1:rx])
-        Λx = Λ^2
+        Λx = F.S[1:rx].^2
         Λy = copy(Λx)
     else
         # calculate Jacobian and its transformed version
         Cx, Cy = gramians(jacob!, sens, Σϵ, X, Σx, config)
+
+        # trying this out
+        #HXp = whiten(Y,Σϵ)
+        #Cy = cov(HXp)
 
         V, Λx, _ = svd(Symmetric(Cx))  # Λx = Λ^2
         U, Λy, _ = svd(Symmetric(Cy))  # Λy = Λ^2
@@ -137,7 +149,7 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
     #Y̆ = Ur'*whiten(innov, Σϵ)
 
     # perform the update
-    if Ne == 1 && linear_flag
+    if Ne == 1 || linear_flag
         ΣY̆ = Λ^2+I
         ΣX̆Y̆ = Λ
         #K̃ = Λ*inv(Λ^2+I)
@@ -152,15 +164,22 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
         #X̆p = Vr'*inv(sqrt(Σx))*X
         #HX̆p = Ur'*inv(sqrt(Σϵ))*Y
         #ϵ̆p = Ur'*inv(sqrt(Σϵ))*ϵ
+        CHH = cov(HX̆p)
+        Cee = cov(ϵ̆p)
 
-        ΣY̆ = cov(HX̆p) + cov(ϵ̆p)  # should be analogous to Λ^2 + I
+        #ρ = 0.25
+        α = 1.0
+        ΣY̆ = CHH + α*Cee
+        #fact = 2
+        #while α*norm(ΣY̆\mean(Y̆)) < ρ*norm(mean(Y̆))
+        #  α *= fact
+        #  fact *= 2
+        #  ΣY̆ = CHH + α*Cee  # should be analogous to Λ^2 + I
+        #end
         ΣX̆Y̆ = cov(X̆p,HX̆p) # should be analogous to Λ
     end
     X .+= sqrt(Σx)*Vr*ΣX̆Y̆*(ΣY̆\Y̆)
 
-    #yerr = norm(mean(ystar - Y))/norm(mean(ystar))
-    yerr = norm(inv(sqrt(Σϵ))*(ystar-mean(Y)))
-    #yerr = norm(ystar-Y,Σϵ)
 
     soln = LowRankENKFSolution(X,Xf,crit_ratio,V,U,Λx,Λy,rx,ry,Σx,Σϵ,Y̆,ΣY̆,ΣX̆Y̆,yerr)
 

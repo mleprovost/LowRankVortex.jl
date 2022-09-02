@@ -139,3 +139,60 @@ end
 
 	@test isapprox(∂p, ∂pAD, atol = atol_AD)
 end
+
+@testset "Dispatch on pressure routines" begin
+	sens = range(-2.0,2.0,length=11) .- 0.0*im
+
+	Nv = 3
+	δ = 0.01
+	config_data = VortexConfig(Nv, δ)
+
+	z0 = complex(0.0)
+	Γ0 = 1.0
+	σx, σΓ = 1.0, 0.5
+
+	zv, Γv = pointcluster(Nv,z0,Γ0,σx,σΓ)
+	vort = Vortex.Blob.(zv,Γv,δ)
+
+	p = analytical_pressure(sens,vort,config_data)
+	p2 = analytical_pressure(sens,vort)
+	@test p == p2
+
+	x = lagrange_to_state_reordered(vort,config_data)
+
+	H = zeros(Float64,length(sens),length(x))
+	analytical_pressure_jacobian!(H,sens,vort,config_data)
+
+	H2 = zeros(Float64,length(sens),length(x))
+	analytical_pressure_jacobian!(H2,sens,vort)
+
+	@test H == H2
+
+	a1 = 0.5; b1 = 0.1; ccoeff = ComplexF64[0.5(a1+b1),0,0.5(a1-b1)]
+  b = Bodies.ConformalBody(ccoeff,ComplexF64(0.0),0.0)
+
+	Nsens = 10
+	θsens = range(0,2π,length=Nsens+1)
+	sens = exp.(im*θsens[1:end-1])
+
+  config_data = VortexConfig(Nv, δ,body=b)
+
+	zv = LowRankVortex.random_points_unit_circle(Nv,1.05,1.4)
+  vort = Vortex.Blob.(zv,Γv,δ)
+
+	p = analytical_pressure(sens,vort,config_data)
+	p2 = analytical_pressure(sens,vort,b)
+
+	@test p == p2
+
+	x = lagrange_to_state_reordered(vort,config_data)
+
+	H = zeros(Float64,length(sens),length(x))
+	analytical_pressure_jacobian!(H,sens,vort,config_data)
+
+	H2 = zeros(Float64,length(sens),length(x))
+	analytical_pressure_jacobian!(H2,sens,vort,b)
+
+	@test H == H2
+
+end

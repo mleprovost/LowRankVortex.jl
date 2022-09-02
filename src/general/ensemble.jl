@@ -106,15 +106,24 @@ whiten(X::BasicEnsembleMatrix,Σx::Union{UniformScaling,AbstractMatrix}) = inv(s
 """
     norm(X::BasicEnsembleMatrix,Σx)
 
-Calculate ``||x||_{\\Sigma^{-1}_x} = \\sqrt{x^T {\\Sigma^{-1}_x} x}``
+Calculate the norm ``||x||_{\\Sigma^{-1}_x} = \\sqrt{x^T {\\Sigma^{-1}_x} x}``
+as an estimate of the expected value over the ensemble in `X`
 """
 function norm(X::BasicEnsembleMatrix,Σx::Union{UniformScaling,AbstractMatrix})
   out = 0.0
-  for x in X
-    out += norm(inv(sqrt(Σx))*x)^2
+  for x in eachcol(X)
+    out += norm(vec(x),Σx)^2
   end
   return sqrt(out/size(X,2))
 end
+
+"""
+    norm(x::AbstractVector,Σx)
+
+Calculate the norm ``||x||_{\\Sigma^{-1}_x} = \\sqrt{x^T {\\Sigma^{-1}_x} x}``
+"""
+norm(x::AbstractVector,Σx::Union{UniformScaling,AbstractMatrix}) = norm(inv(sqrt(Σx))*x)
+
 
 """
     additive_inflation!(X::BasicEnsembleMatrix,Σx)
