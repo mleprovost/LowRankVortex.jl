@@ -24,7 +24,8 @@ function lagrange_to_state_reordered(source::Vector{T}, config::VortexConfig{Bod
         bi = source[i]
         zi = Elements.position(bi)
         ri, Θi = abs(zi), angle(zi)
-        states[i] = ri
+        #states[i] = ri
+        states[i] = log(ri-1.0)
         states[Nv+i] = ri*Θi
         states[2*Nv+i] =  strength(bi)
     end
@@ -52,8 +53,15 @@ end
 function state_to_lagrange_reordered(state::AbstractVector{Float64}, config::VortexConfig{Bodies.ConformalBody}; isblob::Bool=true)
     Nv = length(state) ÷ 3
 
-    ζv = [state[i]*exp(im*state[Nv+i]/state[i]) for i in 1:Nv]
-    Γv = [state[2Nv+i] for i in 1:Nv]
+    ζv = zeros(ComplexF64,Nv)
+    Γv = zeros(Float64,Nv)
+    for i in 1:Nv
+      #rv = state[i]
+      rv = 1.0 + exp(state[i])
+      Θv = state[Nv+i]/rv
+      ζv[i] = rv*exp(im*Θv)
+      Γv[i] = state[2Nv+i]
+    end
 
     if isblob #return collection of regularized point vortices
         blobs = Nv > 0 ? Vortex.Blob.(ζv, Γv, config.δ) : Vortex.Blob[]

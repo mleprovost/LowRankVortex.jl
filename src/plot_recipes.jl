@@ -74,7 +74,7 @@ const color_palette = [colorant"firebrick";
   for j in 1:Nv
     #xj = map(x -> mean(x.Xf)[2j-1],solhist)
     #yj = map(x -> mean(x.Xf)[2j],solhist)
-    rj = map(x -> mean(x.Xf)[j],solhist)
+    rj = map(x -> 1.0 + exp(mean(x.Xf)[j]),solhist)
     rΘj = map(x -> mean(x.Xf)[Nv+j],solhist)
     ζj = rj.*exp.(im*rΘj./rj)
     zj = Elements.conftransform(ζj,b)
@@ -202,7 +202,7 @@ end
 @userplot Showmode
 
 @recipe function f(h::Showmode)
-    jdex, mode, solhist = h.args
+    jdex, mode, solhist, config = h.args
     Nv = size(solhist[1].X,1) ÷ 3
 
     sol = solhist[jdex]
@@ -212,8 +212,26 @@ end
     Y̆mean = mean(sol.Y̆)
 
     Xfmean = mean(sol.Xf)
-    xjf = Xfmean[1:2:2Nv]
-    yjf = Xfmean[2:2:2Nv]
+    vortf = state_to_lagrange_reordered(Xfmean,config)
+    vortf_z = Elements.conftransform(vortf,config.body)
+    xjf, yjf = reim(Elements.position(vortf_z))
+    Γf = LowRankVortex.strength(vortf_z)
+
+    Umode = U[:,mode]
+    Vmode = V[:,mode]
+
+    Xf_plus = Xfmean .+ Vmode
+    vort_plus = state_to_lagrange_reordered(Xf_plus,config)
+    vort_plus_z = Elements.conftransform(vort_plus,config.body)
+    xplus, yplus = reim(Elements.position(vort_plus_z))
+    Γplus = LowRankVortex.strength(vort_plus_z)
+
+    dx = xplus .- xjf
+    dy = yplus .- yjf
+    dΓ = Γplus .- Γf
+
+    #xjf = Xfmean[1:2:2Nv]
+    #yjf = Xfmean[2:2:2Nv]
 
     layout := @layout [a{0.5w} b{0.5w}]
 
@@ -233,14 +251,14 @@ end
         #markersize := setmarkersize.(V[2Nv+1:3Nv,mode])
         markersize := 5
         markercolor := :RdBu_4
-        marker_z := V[2Nv+1:3Nv,mode]
-        xjf.+V[1:2:2Nv,mode], yjf.+V[2:2:2Nv,mode]
+        marker_z := dΓ
+        xplus, yplus
       end
 
       @series begin
         subplot := 2
         seriestype := :quiver
-        quiver := (V[1:2:2Nv,mode],V[2:2:2Nv,mode])
+        quiver := (dx,dy)
         ratio := 1
         legend := :false
         clims := (-1,1)
@@ -254,7 +272,7 @@ end
         xlabel --> "sensor no."
         xlims := (1,lenU)
         ylims := (-5/sqrt(lenU),5/sqrt(lenU))
-        U[:,mode]
+        Umode
       end
 
     #=

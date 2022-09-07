@@ -38,8 +38,6 @@ end
 
 function analytical_dpdΓv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
 
-  # map elements to circle plane
-  #v_ζ = Elements.inverse_conftransform(v,b)
   return Bodies.dpdΓv(ζ,l,v_ζ,b)
 
 end

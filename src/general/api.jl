@@ -1,9 +1,10 @@
 export gramians, observations!, observations, adaptive_lowrank_enkf!, LowRankENKFSolution
 
 
-struct LowRankENKFSolution{XT,YT,SIGXT,SIGYT,SYT,SXYT}
+struct LowRankENKFSolution{XT,YT,YYT,SIGXT,SIGYT,SYT,SXYT}
    X :: XT
    Xf :: XT
+   Y :: YYT
    crit_ratio :: Float64
    V :: AbstractMatrix{Float64}
    U :: AbstractMatrix{Float64}
@@ -54,6 +55,34 @@ function gramians(jacob!,sens::AbstractVector,Σϵ,X::EnsembleMatrix{Nx,Ne},Σx,
 end
 
 """
+    gramians_approx(jacob!,sens,Σϵ,X,Σx,config) -> Matrix, Matrix
+
+Compute the state and observation gramians Cx and Cy using an approximation
+in which we evaluate the jacobian at the mean of the ensemble `X`. The function `jacob!` should
+take as inputs a matrix J (of size Ny x Nx), a Ny vector of measurement points (`sens`),
+a vector of vortices, and the configuration data `config`.
+"""
+function gramians_approx(jacob!,sens::AbstractVector,Σϵ,X::EnsembleMatrix{Nx,Ne},Σx,config::VortexConfig) where {Nx,Ne}
+
+    Ny = length(sens)
+    H = zeros(Float64,Ny,Nx)
+    Cx = zeros(Float64,Nx,Nx)
+    Cy = zeros(Float64,Ny,Ny)
+    invDϵ = inv(sqrt(Σϵ))
+    Dx = sqrt(Σx)
+
+    vmean = state_to_lagrange_reordered(mean(X),config)
+    jacob!(H,sens,vmean,config)
+
+    H̃ = invDϵ*H*Dx
+
+    Cx .= H̃'*H̃
+    Cy .= H̃*H̃'
+
+    return Cx, Cy
+end
+
+"""
     observations!(Y::EnsembleMatrix,X::EnsembleMatrix,h::Function,sens,config)
 
 Compute the observation function `h` for each of the states in `X` and place them in `Y`.
@@ -94,8 +123,6 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
     Xf = deepcopy(X)
 
     # Calculate error
-    #yerr = norm(mean(ystar - Y))/norm(mean(ystar))
-    #yerr = norm(inv(sqrt(Σϵ))*(ystar-mean(Y)))
     yerr = norm(ystar-mean(Y),Σϵ)
     #yerr = norm(ystar-Y+ϵ,Σϵ)
 
@@ -104,18 +131,24 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
 
         # the next two lines should be combined into one step
         # that takes in X(j) and returns Hj
-        vj = state_to_lagrange_reordered(X(1),config)
-        jacob!(H,sens,vj,config)
+        vmean = state_to_lagrange_reordered(mean(X),config)
+        jacob!(H,sens,vmean,config)
 
         H̃ = inv(sqrt(Σϵ))*H*sqrt(Σx)
-        F = svd(H̃)
 
-        #r = findfirst(x-> x >= crit_ratio, cumsum(F.S)./sum(F.S))
-        rx = size(X,1)
-        ry = rx
+        sqrt_Σ̃x = sqrt(cov(whiten(X,Σx)))
+        H̃ .= H̃*sqrt_Σ̃x
+
+        F = svd(H̃)
 
         V = F.V
         U = F.U
+
+        #rx = size(X,1)
+        #ry = rx
+        rx = crit_ratio < 1.0 ? findfirst(x-> x >= crit_ratio, cumsum(F.S.^2)./sum(F.S.^2)) : rxdefault
+        ry = crit_ratio < 1.0 ? findfirst(x-> x >= crit_ratio, cumsum(F.S.^2)./sum(F.S.^2)) : rydefault
+
         Vr = V[:,1:rx]
         Ur = U[:,1:ry]
         Λ = Diagonal(F.S[1:rx])
@@ -123,18 +156,15 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
         Λy = copy(Λx)
     else
         # calculate Jacobian and its transformed version
-        Cx, Cy = gramians(jacob!, sens, Σϵ, X, Σx, config)
+        #Cx, Cy = gramians(jacob!, sens, Σϵ, X, Σx, config)
+        Cx, Cy = gramians_approx(jacob!, sens, Σϵ, X, Σx, config)
 
-        # trying this out
-        #HXp = whiten(Y,Σϵ)
-        #Cy = cov(HXp)
 
         V, Λx, _ = svd(Symmetric(Cx))  # Λx = Λ^2
         U, Λy, _ = svd(Symmetric(Cy))  # Λy = Λ^2
 
         # find reduced rank
         rx = crit_ratio < 1.0 ? findfirst(x-> x >= crit_ratio, cumsum(Λx)./sum(Λx)) : rxdefault
-
         ry = crit_ratio < 1.0 ? findfirst(x-> x >= crit_ratio, cumsum(Λy)./sum(Λy)) : rydefault
 
         # rank reduction
@@ -152,8 +182,7 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
     if Ne == 1 || linear_flag
         ΣY̆ = Λ^2+I
         ΣX̆Y̆ = Λ
-        #K̃ = Λ*inv(Λ^2+I)
-        #K̃ = ΣX̆Y̆*inv(ΣY̆)
+        sqrt_Σx = sqrt(Σx)*sqrt_Σ̃x
     else
         #X̆p = ensemble_perturb(Vr'*whiten(X,Σx))
         #HX̆p = ensemble_perturb(Ur'*whiten(Y,Σϵ))
@@ -167,21 +196,15 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
         CHH = cov(HX̆p)
         Cee = cov(ϵ̆p)
 
-        #ρ = 0.25
-        α = 1.0
-        ΣY̆ = CHH + α*Cee
-        #fact = 2
-        #while α*norm(ΣY̆\mean(Y̆)) < ρ*norm(mean(Y̆))
-        #  α *= fact
-        #  fact *= 2
-        #  ΣY̆ = CHH + α*Cee  # should be analogous to Λ^2 + I
-        #end
+        ΣY̆ = CHH + Cee
         ΣX̆Y̆ = cov(X̆p,HX̆p) # should be analogous to Λ
+
+        sqrt_Σx = sqrt(Σx)
     end
-    X .+= sqrt(Σx)*Vr*ΣX̆Y̆*(ΣY̆\Y̆)
+    X .+= sqrt_Σx*Vr*ΣX̆Y̆*(ΣY̆\Y̆)
 
 
-    soln = LowRankENKFSolution(X,Xf,crit_ratio,V,U,Λx,Λy,rx,ry,Σx,Σϵ,Y̆,ΣY̆,ΣX̆Y̆,yerr)
+    soln = LowRankENKFSolution(X,Xf,Y,crit_ratio,V,U,Λx,Λy,rx,ry,Σx,Σϵ,Y̆,ΣY̆,ΣX̆Y̆,yerr)
 
     return soln
 end

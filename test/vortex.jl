@@ -116,8 +116,8 @@ end
   vort = Vortex.Blob.(zv,Γv,δ)
 
   x = lagrange_to_state_reordered(vort,config_data)
-  @test x[1] == abs(vort[1].z) && x[Nv+1] == angle(vort[1].z)*abs(vort[1].z)
-  @test x[2] == abs(vort[2].z) && x[Nv+2] == angle(vort[2].z)*abs(vort[2].z)
+  @test x[1] == log(abs(vort[1].z)-1.0) && x[Nv+1] == angle(vort[1].z)*abs(vort[1].z)
+  @test x[2] == log(abs(vort[2].z)-1.0) && x[Nv+2] == angle(vort[2].z)*abs(vort[2].z)
   @test x[2Nv+1] == vort[1].S
   @test x[2Nv+2] == vort[2].S
 
