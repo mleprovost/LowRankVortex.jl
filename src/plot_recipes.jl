@@ -20,11 +20,16 @@ const color_palette = [colorant"firebrick";
 
 @userplot Filtertrajectory
 
+_physical_space_sensors(sens,config) = sens
+_physical_space_sensors(sens,config::VortexConfig{Bodies.ConformalBody}) = Bodies.conftransform(sens,config.body)
+
 @recipe function f(h::Filtertrajectory)
 
-  solhist, sens, vort_true, config = h.args
+  solhist, obs, vort_true = h.args
 
-  Nv = size(solhist[1].X,1) ÷ 3
+  config = obs.config
+  Nv = config.Nv
+
   truez = Elements.position(vort_true)
   trueΓ = LowRankVortex.strength(vort_true)
 
@@ -61,12 +66,16 @@ const color_palette = [colorant"firebrick";
   end
   =#
 
-  @series begin
-    seriestype := :scatter
-    markersize --> 5
-    markercolor --> :blue
-    label := "sensor"
-    real.(sens), imag.(sens)
+  if hasfield(typeof(obs),:sens)
+    sens = _physical_space_sensors(obs.sens,config)
+
+    @series begin
+      seriestype := :scatter
+      markersize --> 5
+      markercolor --> :blue
+      label := "sensor"
+      real.(sens), imag.(sens)
+    end
   end
 
   #col = theme_palette(:auto)
