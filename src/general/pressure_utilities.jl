@@ -46,14 +46,13 @@ end
 
 ### FORCE ###
 
-# These don't actually need ζ
-function analytical_force(ζ,v::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where {T<:Element}
+function analytical_force(v::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where {T<:Element}
     fx, fy, mr = Bodies.force(v,config.body;kwargs...)
     return [fx,fy,mr]
 end
 
 
-function analytical_dfdζv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
+function analytical_dfdζv(l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
 
   dfx, dfy, dmr = Bodies.dfdζv(l,v_ζ,b)
 
@@ -61,7 +60,7 @@ function analytical_dfdζv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody
 
 end
 
-function analytical_dfdΓv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
+function analytical_dfdΓv(l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
 
   dfx, dfy, dmr = Bodies.dfdΓv(l,v_ζ,b)
 

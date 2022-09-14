@@ -14,6 +14,7 @@ using TransportBasedInference
 using NamedColors
 using StaticArrays
 using Distributions
+using UnPack
 
 
 
@@ -35,10 +36,11 @@ include("lowrankenkf_symmetric_vortexassim.jl")
 include("adaptive_lowrankenkf_symmetric_vortexassim.jl")
 include("plot_recipes.jl")
 
+include("general/ensemble.jl")
+include("general/observation.jl")
 include("general/pressure_utilities.jl")
 include("general/state_utilities.jl")
 include("general/jacobian.jl")
-include("general/ensemble.jl")
 include("general/vortex.jl")
 include("general/api.jl")
 

@@ -9,8 +9,8 @@ analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64},source::Vec
 analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T},config::VortexConfig;kwargs...) where T <: PotentialFlow.Element =
 			analytical_pressure_jacobian!(J,target,source;kwargs...)
 
-analytical_force_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where T <: PotentialFlow.Element =
-			analytical_force_jacobian!(J,target,source,config.body;kwargs...)
+analytical_force_jacobian!(J, source::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where T <: PotentialFlow.Element =
+			analytical_force_jacobian!(J,source,config.body;kwargs...)
 
 
 function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, b::Bodies.ConformalBody; kwargs...) where T <: PotentialFlow.Element
@@ -66,10 +66,10 @@ analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Ve
 		analytical_pressure_jacobian!(J,target,source;kwargs...)
 
 
-function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, b::Bodies.ConformalBody; kwargs...) where T <: PotentialFlow.Element
+function analytical_force_jacobian!(J,source::Vector{T}, b::Bodies.ConformalBody; kwargs...) where T <: PotentialFlow.Element
 	Nv = length(source)
 	Nx = 3*Nv
-	Ny = size(target, 1)
+	Ny = 3
   #J = zeros(Float64,Ny,Nx)
   @assert size(J) == (Ny, Nx)
 
@@ -80,39 +80,12 @@ function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, s
 		#dpdzi = analytical_dpdzv(target, i, source, b; kwargs...)
 		#J[:,2*i-1] .= 2*real.(dpdzi)
 		#J[:,2*i] .= -2*imag.(dpdzi)
-		dpdζi = analytical_dpdζv(target, i, source, b; kwargs...)
-		ζi = Elements.position(source[i])
-		J[:,i] .= 2*(abs(ζi)-1.0)*real.(dpdζi*ζi/abs(ζi))
-		J[:,Nv+i] .= -2*imag.(dpdζi*ζi/abs(ζi))
-
-		dpdΓi = analytical_dpdΓv(target, i, source, b; kwargs...)
-		J[:,2*Nv+i] .= dpdΓi
-	end
-
-	return J
-end
-
-# This does not actually need `target`
-function analytical_force_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, b::Bodies.ConformalBody; kwargs...) where T <: PotentialFlow.Element
-	Nv = length(source)
-	Nx = 3*Nv
-	Ny = size(target, 1)
-  #J = zeros(Float64,Ny,Nx)
-  @assert size(J) == (Ny, Nx)
-
-	# dpdzi = zeros(ComplexF64, Ny)
-	# dpdΓi = zeros(Ny)
-
-	for i=1:Nv
-		#dpdzi = analytical_dpdzv(target, i, source, b; kwargs...)
-		#J[:,2*i-1] .= 2*real.(dpdzi)
-		#J[:,2*i] .= -2*imag.(dpdzi)
-		dfdζi = analytical_dfdζv(target, i, source, b; kwargs...)
+		dfdζi = analytical_dfdζv(i, source, b; kwargs...)
 		ζi = Elements.position(source[i])
 		J[:,i] .= 2*(abs(ζi)-1.0)*real.(dfdζi*ζi/abs(ζi))
 		J[:,Nv+i] .= -2*imag.(dfdζi*ζi/abs(ζi))
 
-		dfdΓi = analytical_dfdΓv(target, i, source, b; kwargs...)
+		dfdΓi = analytical_dfdΓv(i, source, b; kwargs...)
 		J[:,2*Nv+i] .= dfdΓi
 	end
 
