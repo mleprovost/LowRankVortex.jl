@@ -1,4 +1,5 @@
-export analytical_pressure, analytical_dpdzv, analytical_dpdΓv
+export analytical_pressure, analytical_dpdzv, analytical_dpdΓv, analytical_force, analytical_dfdζv,
+        analytical_dfdΓv
 
 
 # A few helper routines
@@ -11,6 +12,7 @@ analytical_pressure(ζ,v::Vector{T},config::VortexConfig;kwargs...) where {T<:El
 
 analytical_pressure(z,v::Vector{T},config::VortexConfig{DataType}) where {T<:Element} =
     analytical_pressure(z,v;ϵ=config.δ,walltype=config.body)
+
 
 
 ### For conformally mapped bodies
@@ -41,6 +43,33 @@ function analytical_dpdΓv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody
   return Bodies.dpdΓv(ζ,l,v_ζ,b)
 
 end
+
+### FORCE ###
+
+# These don't actually need ζ
+function analytical_force(ζ,v::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where {T<:Element}
+    fx, fy, mr = Bodies.force(v,config.body;kwargs...)
+    return [fx,fy,mr]
+end
+
+
+function analytical_dfdζv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
+
+  dfx, dfy, dmr = Bodies.dfdζv(l,v_ζ,b)
+
+  return [dfx, dfy, dmr]
+
+end
+
+function analytical_dfdΓv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
+
+  dfx, dfy, dmr = Bodies.dfdΓv(l,v_ζ,b)
+
+  return [dfx, dfy, dmr]
+
+end
+
+### PRESSURE ROUTINES FOR FULL-SPACE OR FLAT WALL CASES
 
 ### Define the pressure and its gradients
 

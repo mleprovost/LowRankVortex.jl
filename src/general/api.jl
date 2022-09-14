@@ -1,4 +1,4 @@
-export gramians, observations!, observations, adaptive_lowrank_enkf!, LowRankENKFSolution
+export vortexinference, gramians, observations!, observations, adaptive_lowrank_enkf!, LowRankENKFSolution
 
 
 struct LowRankENKFSolution{XT,YT,YYT,SIGXT,SIGYT,SYT,SXYT}
@@ -19,6 +19,62 @@ struct LowRankENKFSolution{XT,YT,YYT,SIGXT,SIGYT,SYT,SXYT}
    ΣX̆Y̆ :: SXYT
    yerr :: Float64
 end
+
+# Need to set this up differently so that it does not need `sens`, but
+# has some other way to be informed of length and type of measurement vector
+"""
+    vortexinference(Nv,sens,ystar,xr::Tuple,yr::Tuple,Γr::Tuple,ϵmeas,ϵx,ϵy,ϵΓ,config::VortexConfig
+                    [,Ne=50][,maxiter=50][,numsample=5],kwargs...)
+
+Generate `numsample` trajectories of the vortex inference problem, using initial
+states that are drawn from a uniform distribution in the ranges `xr`, `yr`, `Γr` for
+the `Nv` vortices. The state covariance is set by the standard deviations `ϵx`,
+`ϵy`, `ϵΓ`, and the measurement covariance by `ϵmeas`. Each of the trajectories will use an ensemble of `Ne` members
+and will run for `maxiter` iterations. For `ConformalBody` problems,
+`xr`, `yr` and `ϵx`, `ϵy` should be interpreted as describing the generalized state components
+in the circle plane (``r`` and ``\\theta``).
+"""
+function vortexinference(Nv,sens,ystar,xr,yr,Γr,ϵmeas,ϵX,ϵY,ϵΓ,config::VortexConfig;linear_flag=true,Ne=50,maxiter=50,numsample=5,crit_ratio=1.0,β=1.02,inflate=true)
+    Ny = length(sens)
+    sol_collection = []
+
+    Σϵ = Diagonal(ϵmeas^2*ones(Ny))
+    Σx = Diagonal(vcat(ϵX^2*ones(Nv),ϵY^2*ones(Nv),ϵΓ^2*ones(Nv)))
+
+    lk = ReentrantLock()
+
+    Threads.@threads for i in 1:numsample
+        # things to do for every sample from prior
+
+        # generate new sample
+        zv_prior, Γv_prior = createclusters(Nv,1,xr,yr,Γr,0.0,0.0;body=config.body)
+        vort_prior = Vortex.Blob.(zv_prior,Γv_prior,config.δ)
+        x_prior = lagrange_to_state_reordered(vort_prior,config)
+        X0 = create_ensemble(Ne,x_prior,Σx)
+        X = deepcopy(X0)
+        Y = similar(X,dims=(Ny,Ne))
+
+        rx_set = min(size(X0,1),Ny)
+        ry_set = min(size(X0,1),Ny)
+
+        # Initialize history
+        solhist = []
+
+        for i = 1:maxiter
+            sol = adaptive_lowrank_enkf!(X,Σx,Y,Σϵ,ystar,analytical_pressure,analytical_pressure_jacobian!,sens,config; linear_flag=linear_flag,crit_ratio=crit_ratio, rxdefault = rx_set, rydefault = ry_set, inflate=inflate, β = β)
+            #ϵX = min(0.01*sol.yerr,0.05)
+            #ϵΓ = min(0.01*sol.yerr,0.05)
+            #Σx = Diagonal(vcat(ϵX^2*ones(Nv),ϵX^2*ones(Nv),ϵΓ^2*ones(Nv)));
+            push!(solhist,deepcopy(sol))
+        end
+        lock(lk) do
+          push!(sol_collection,deepcopy(solhist))
+        end
+    end
+    return sol_collection
+
+end
+
 
 """
     gramians(jacob!,sens,Σϵ,X,Σx,config) -> Matrix, Matrix
@@ -115,11 +171,13 @@ end
 """
         adaptive_lowrank_enkf!(X,Σx,sens,Σϵ,ystar,h,jacob!)
 """
-function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h,jacob!,sens,config::VortexConfig; rxdefault = Nx, rydefault = length(sens), crit_ratio = 1.0, inflate=true,β=1.0,linear_flag=true) where {Nx,Ne}
+function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y::BasicEnsembleMatrix{Ny,Ne},Σϵ,ystar,h,jacob!,sens,config::VortexConfig;
+                                  rxdefault = Nx, rydefault = Ny, crit_ratio = 1.0,
+                                  inflate=true,β=1.0,linear_flag=true) where {Nx,Ny,Ne}
     inflate && additive_inflation!(X,Σx)
     inflate && multiplicative_inflation!(X,β)
     observations!(Y,X,h,sens,config)
-    ϵ = create_ensemble(Ne,zeros(length(sens)),Σϵ)
+    ϵ = create_ensemble(Ne,zeros(Ny),Σϵ)
     Xf = deepcopy(X)
 
     # Calculate error
@@ -127,11 +185,13 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
     #yerr = norm(ystar-Y+ϵ,Σϵ)
 
     if Ne == 1 || linear_flag
-        H = zeros(Float64,length(sens),size(X,1))
+        H = zeros(Float64,Ny,Nx)
 
         # the next two lines should be combined into one step
         # that takes in X(j) and returns Hj
         vmean = state_to_lagrange_reordered(mean(X),config)
+
+        # Remove `sens` from this.
         jacob!(H,sens,vmean,config)
 
         H̃ = inv(sqrt(Σϵ))*H*sqrt(Σx)
@@ -156,6 +216,7 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y,Σϵ,ystar,h
         Λy = copy(Λx)
     else
         # calculate Jacobian and its transformed version
+        # These use `sens` to determine length of measurement vector
         #Cx, Cy = gramians(jacob!, sens, Σϵ, X, Σx, config)
         Cx, Cy = gramians_approx(jacob!, sens, Σϵ, X, Σx, config)
 

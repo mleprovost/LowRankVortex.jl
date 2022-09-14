@@ -22,11 +22,8 @@ const color_palette = [colorant"firebrick";
 
 @recipe function f(h::Filtertrajectory)
 
-  if length(h.args) > 3
-    solhist, sens, vort_true, b = h.args
-  else
-    solhist, sens, vort_true = h.args
-  end
+  solhist, sens, vort_true, config = h.args
+
   Nv = size(solhist[1].X,1) ÷ 3
   truez = Elements.position(vort_true)
   trueΓ = LowRankVortex.strength(vort_true)
@@ -43,10 +40,12 @@ const color_palette = [colorant"firebrick";
     real(truez), imag(truez)
   end
 
-  if length(h.args) > 3
+  bflag = false
+  if typeof(config.body) == Bodies.ConformalBody
+    bflag = true
     @series begin
       label := "body"
-      b
+      config.body
     end
   end
 
@@ -74,10 +73,12 @@ const color_palette = [colorant"firebrick";
   for j in 1:Nv
     #xj = map(x -> mean(x.Xf)[2j-1],solhist)
     #yj = map(x -> mean(x.Xf)[2j],solhist)
-    rj = map(x -> 1.0 + exp(mean(x.Xf)[j]),solhist)
-    rΘj = map(x -> mean(x.Xf)[Nv+j],solhist)
-    ζj = rj.*exp.(im*rΘj./rj)
-    zj = Elements.conftransform(ζj,b)
+    zj = map(x -> state_to_positions_and_strengths(mean(x.Xf),config)[1][j],solhist)
+
+    #rj = map(x -> 1.0 + exp(mean(x.Xf)[j]),solhist)
+    #rΘj = map(x -> mean(x.Xf)[Nv+j],solhist)
+    #ζj = rj.*exp.(im*rΘj./rj)
+    zj = bflag ? Elements.conftransform(zj,config.body) : zj
     xj, yj = real(zj), imag(zj)
     @series begin
       seriestype := :path
@@ -203,6 +204,12 @@ end
 
 @recipe function f(h::Showmode)
     jdex, mode, solhist, config = h.args
+
+    bflag = false
+    if typeof(config.body) == Bodies.ConformalBody
+      bflag = true
+    end
+
     Nv = size(solhist[1].X,1) ÷ 3
 
     sol = solhist[jdex]
@@ -212,19 +219,22 @@ end
     Y̆mean = mean(sol.Y̆)
 
     Xfmean = mean(sol.Xf)
-    vortf = state_to_lagrange_reordered(Xfmean,config)
-    vortf_z = Elements.conftransform(vortf,config.body)
-    xjf, yjf = reim(Elements.position(vortf_z))
-    Γf = LowRankVortex.strength(vortf_z)
+    #vortf = state_to_lagrange_reordered(Xfmean,config)
+    #vortf_z = Elements.conftransform(vortf,config.body)
+    #xjf, yjf = reim(Elements.position(vortf_z))
+    #Γf = LowRankVortex.strength(vortf_z)
+    zf, Γf = state_to_positions_and_strengths(Xfmean,config)
+    zf = bflag ? Elements.conftransform(zf,config.body) : zf
+
+    xjf, yjf = reim(zf)
 
     Umode = U[:,mode]
     Vmode = V[:,mode]
 
     Xf_plus = Xfmean .+ Vmode
-    vort_plus = state_to_lagrange_reordered(Xf_plus,config)
-    vort_plus_z = Elements.conftransform(vort_plus,config.body)
-    xplus, yplus = reim(Elements.position(vort_plus_z))
-    Γplus = LowRankVortex.strength(vort_plus_z)
+    zplus, Γplus = state_to_positions_and_strengths(Xf_plus,config)
+    zplus = bflag ? Elements.conftransform(zplus,config.body) : zplus
+    xplus, yplus = reim(zplus)
 
     dx = xplus .- xjf
     dy = yplus .- yjf
@@ -239,7 +249,7 @@ end
       subplot := 2
       seriestype := :scatter
       markercolor := :white
-      markersize := 5
+      markersize --> 5
       xjf, yjf
     end
 
@@ -249,7 +259,7 @@ end
         subplot := 2
         seriestype := :scatter
         #markersize := setmarkersize.(V[2Nv+1:3Nv,mode])
-        markersize := 5
+        markersize --> 5
         markercolor := :RdBu_4
         marker_z := dΓ
         xplus, yplus

@@ -10,18 +10,25 @@ function vortexmoment(mom::Int,zv::AbstractVector,Γv::AbstractVector)
 end
 
 """
-    createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx,σΓ;cluster_circle_radius=0.0,each_cluster_radius=0.0) -> Vector{ComplexF64}, Vector{Float64}
+    createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx,σΓ;body=nothing,each_cluster_radius=0.0) -> Vector{ComplexF64}, Vector{Float64}
 
 Return `Nclusters` clusters of points and their strengths. The centers of the clusters are distributed
 randomly in the box `xr` x `yr`. Their total strengths
 are uniformly distributed in the range `Γr`. . Within each cluster,
 the points are distributed randomly about the cluster center accordingly to `σx`, with strengths
 randomly distributed about the cluster strength (divided equally), with standard deviation `σΓ`.
-If `cluster_circle_radius` is set to a value larger than 0, then the cluster centers are perturbed from
-a circle of that radius. If `each_cluster_radius` is set larger than 0, then each cluster is
-first distributed on a circle of that radius before being perturbed.
+If `each_cluster_radius` is set larger than 0, then each cluster is
+first distributed on a circle of that radius before being perturbed. If `body` is provided
+with a `ConformalBody`, then points are uniformly
+distributed circumferentially in the range `yr` and log-normally in the radial direction,
+with a median (peak) at radial distance ``1 + \\sqrt{(r_{min}-1)(r_{max}-1)}``, where
+`xr = (rmin,rmax)`.
 """
-function createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx,σΓ;cluster_circle_radius=0.0,each_cluster_radius=0.0)
+createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx,σΓ;body=nothing,each_cluster_radius=0.0) =
+      _createclusters(Nclusters,Npercluster,xr,yr,Γr,σx,σΓ,each_cluster_radius,body)
+
+
+function _createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx,σΓ,each_cluster_radius,b)
     #zc, Γc = pointcluster(Nclusters,z0,Γ0,σcx,σcΓ;circle_radius=cluster_circle_radius)
     zc = random_points_plane(Nclusters,xr...,yr...)
     Γmin, Γmax = Γr
@@ -37,22 +44,23 @@ function createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx
     return zp, Γp
 end
 
-"""
-    createclusters(Nclusters,Npercluster,rmedian,rmax,Γr::Tuple,σx,σΓ,b;cluster_circle_radius=0.0,each_cluster_radius=0.0) -> Vector{ComplexF64}, Vector{Float64}
 
-Return `Nclusters` clusters of points and their strengths about a unit circle. The
-cluster centers are placed randomly about the circle at median radius `rmedian`
-out to a maximum radius of `rmax`. Their total strengths
+"""
+    createclusters(Nclusters,Npercluster,rr::Tuple,Θr::Tuple,Γr::Tuple,σx,σΓ,b::ConformalBody;each_cluster_radius=0.0) -> Vector{ComplexF64}, Vector{Float64}
+
+Return `Nclusters` clusters of points and their strengths about a unit circle, uniformly
+distributed circumferentially in the range `Θr` and log-normally in the radial direction,
+with a median (peak) at radial distance
+``1 + \\sqrt{(r_{min}-1)(r_{max}-1)}``. Their total strengths
 are uniformly distributed in the range `Γr`. Within each cluster,
 the points are distributed randomly about the cluster center accordingly to `σx`, with strengths
 randomly distributed about the cluster strength (divided equally), with standard deviation `σΓ`.
-If `cluster_circle_radius` is set to a value larger than 0, then the cluster centers are perturbed from
-a circle of that radius. If `each_cluster_radius` is set larger than 0, then each cluster is
+If `each_cluster_radius` is set larger than 0, then each cluster is
 first distributed on a circle of that radius before being perturbed.
 """
-function createclusters(Nclusters,Npercluster,rmedian,r4sig,Γr::Tuple,σx,σΓ,b::Bodies.ConformalBody;cluster_circle_radius=0.0,each_cluster_radius=0.0)
+function _createclusters(Nclusters,Npercluster,rr::Tuple,Θr::Tuple,Γr::Tuple,σx,σΓ,each_cluster_radius,b::Bodies.ConformalBody)
     #zc, Γc = pointcluster(Nclusters,z0,Γ0,σcx,σcΓ;circle_radius=cluster_circle_radius)
-    zc = random_points_unit_circle(Nclusters,rmedian,r4sig)
+    zc = random_points_unit_circle(Nclusters,rr,Θr)
     Γmin, Γmax = Γr
     Γc = Γmin .+ (Γmax-Γmin)*rand(Nclusters)
 
@@ -105,23 +113,34 @@ end
 
 
 """
-    random_points_unit_circle(N,rmedian,r4sig) -> Vector{ComplexF64}
+    random_points_unit_circle(N,rr::Tuple,Θr::Tuple) -> Vector{ComplexF64}
 
 Create a set of `N` random points outside the unit circle, uniformly
-distributed circumferentially and log-normally in the radial direction,
+distributed circumferentially in the range `Θr` and log-normally in the radial direction,
 with a median (peak) at radial distance
-`rmedian` (which must be larger than 1), and with almost all of the
-points within `r4sig` (which must be larger than `rmedian`)
+``1 + \\sqrt{(r_{min}-1)(r_{max}-1)}`` (which must be larger than 1), and with almost all of the
+points within ``r_{max}`` (which must be larger than ``r_{min}``)
 """
-function random_points_unit_circle(N,rmedian,r4sig)
-    @assert rmedian > 1 "rmedian must be larger than 1"
-    @assert r4sig > rmedian "r4sig must be larger than rmedian"
-    Θ = 2π*rand(N)
-    z = randn(N)
-    rscatter = ((r4sig-1)/(rmedian-1))^(1/4)
-    σy = log(rscatter)
-    r = 1.0 .+ (rmedian.-1.0).*exp.(σy*z)
+function random_points_unit_circle(N,rr::Tuple,Θr::Tuple)
+    rmin, rmax = rr
+    Θmin, Θmax = Θr
+    @assert rmin > 1 "rmin must be larger than 1"
+    @assert rmax > rmin "rmax must be larger than rmin"
+
+    rmedian = 1.0 + sqrt((rmin-1)*(rmax-1))
+
+    Θ = Θmin .+ (Θmax-Θmin).*rand(N)
+    r = _random_radial_points_unit_circle(N,rmedian,rmax)
+
     return r.*exp.(im*Θ)
 end
 
-random_points_unit_circle(rmedian,r4sig) = first(random_points_unit_circle(1,rmedian,r4sig))
+function _random_radial_points_unit_circle(N,rmedian::Float64,r4sig::Float64)
+  z = randn(N)
+  rscatter = ((r4sig-1)/(rmedian-1))^(1/4)
+  σy = log(rscatter)
+  r = 1.0 .+ (rmedian.-1.0).*exp.(σy*z)
+  return r
+end
+
+_random_radial_points_unit_circle(rmedian,r4sig) = first(_random_points_unit_circle(1,rmedian,r4sig))

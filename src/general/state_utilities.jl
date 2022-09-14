@@ -1,4 +1,4 @@
-export lagrange_to_state_reordered, state_to_lagrange_reordered
+export lagrange_to_state_reordered, state_to_lagrange_reordered, state_to_positions_and_strengths
 
 function lagrange_to_state_reordered(source::Vector{T}, config::VortexConfig) where T <: PotentialFlow.Element
     Nv = length(source)
@@ -33,43 +33,42 @@ function lagrange_to_state_reordered(source::Vector{T}, config::VortexConfig{Bod
     return states
 end
 
-function state_to_lagrange_reordered(state::AbstractVector{Float64}, config::VortexConfig; isblob::Bool=true)
-    Nv = length(state) ÷ 3
 
-    zv = [state[2i-1] + im*state[2i] for i in 1:Nv]
-    Γv = [state[2Nv+i] for i in 1:Nv]
+function state_to_lagrange_reordered(state::AbstractVector{Float64}, config::VortexConfig; isblob::Bool=true)
+
+    zv, Γv = state_to_positions_and_strengths(state,config)
 
     if isblob #return collection of regularized point vortices
-        blobs = Nv > 0 ? Vortex.Blob.(zv, Γv, config.δ) : Vortex.Blob[]
+        blobs = length(zv) > 0 ? Vortex.Blob.(zv, Γv, config.δ) : Vortex.Blob[]
 
         return blobs
     else #return collection of point vortices
-        points = Nv > 0 ? Vortex.Point.(zv, Γv) : Vortex.Point[]
+        points = length(zv) > 0 ? Vortex.Point.(zv, Γv) : Vortex.Point[]
 
         return points
     end
 end
 
-function state_to_lagrange_reordered(state::AbstractVector{Float64}, config::VortexConfig{Bodies.ConformalBody}; isblob::Bool=true)
-    Nv = length(state) ÷ 3
+function state_to_positions_and_strengths(state::AbstractVector{Float64}, config::VortexConfig{Bodies.ConformalBody})
+  Nv = length(state) ÷ 3
 
-    ζv = zeros(ComplexF64,Nv)
-    Γv = zeros(Float64,Nv)
-    for i in 1:Nv
-      #rv = state[i]
-      rv = 1.0 + exp(state[i])
-      Θv = state[Nv+i]/rv
-      ζv[i] = rv*exp(im*Θv)
-      Γv[i] = state[2Nv+i]
-    end
+  ζv = zeros(ComplexF64,Nv)
+  Γv = zeros(Float64,Nv)
+  for i in 1:Nv
+    #rv = state[i]
+    rv = 1.0 + exp(state[i])
+    Θv = state[Nv+i]/rv
+    ζv[i] = rv*exp(im*Θv)
+    Γv[i] = state[2Nv+i]
+  end
+  return ζv, Γv
+end
 
-    if isblob #return collection of regularized point vortices
-        blobs = Nv > 0 ? Vortex.Blob.(ζv, Γv, config.δ) : Vortex.Blob[]
+function state_to_positions_and_strengths(state::AbstractVector{Float64}, config::VortexConfig)
+  Nv = length(state) ÷ 3
 
-        return blobs
-    else #return collection of point vortices
-        points = Nv > 0 ? Vortex.Point.(ζv, Γv) : Vortex.Point[]
+  zv = [state[2i-1] + im*state[2i] for i in 1:Nv]
+  Γv = [state[2Nv+i] for i in 1:Nv]
 
-        return points
-    end
+  return zv, Γv
 end
