@@ -38,6 +38,12 @@ function vortexinference(Nv,sens,ystar,xr,yr,Γr,ϵmeas,ϵX,ϵY,ϵΓ,config::Vor
     Ny = length(sens)
     sol_collection = []
 
+    #h = analytical_pressure
+    #jacob! = analytical_pressure_jacobian!
+
+    h = analytical_force
+    jacob! = analytical_force_jacobian!
+
     Σϵ = Diagonal(ϵmeas^2*ones(Ny))
     Σx = Diagonal(vcat(ϵX^2*ones(Nv),ϵY^2*ones(Nv),ϵΓ^2*ones(Nv)))
 
@@ -61,7 +67,7 @@ function vortexinference(Nv,sens,ystar,xr,yr,Γr,ϵmeas,ϵX,ϵY,ϵΓ,config::Vor
         solhist = []
 
         for i = 1:maxiter
-            sol = adaptive_lowrank_enkf!(X,Σx,Y,Σϵ,ystar,analytical_pressure,analytical_pressure_jacobian!,sens,config; linear_flag=linear_flag,crit_ratio=crit_ratio, rxdefault = rx_set, rydefault = ry_set, inflate=inflate, β = β)
+            sol = adaptive_lowrank_enkf!(X,Σx,Y,Σϵ,ystar,h,jacob!,sens,config; linear_flag=linear_flag,crit_ratio=crit_ratio, rxdefault = rx_set, rydefault = ry_set, inflate=inflate, β = β)
             #ϵX = min(0.01*sol.yerr,0.05)
             #ϵΓ = min(0.01*sol.yerr,0.05)
             #Σx = Diagonal(vcat(ϵX^2*ones(Nv),ϵX^2*ones(Nv),ϵΓ^2*ones(Nv)));
