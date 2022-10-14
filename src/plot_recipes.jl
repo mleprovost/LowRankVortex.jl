@@ -23,7 +23,7 @@ const color_palette = [colorant"firebrick";
 _physical_space_sensors(sens,config) = sens
 _physical_space_sensors(sens,config::VortexConfig{Bodies.ConformalBody}) = Bodies.conftransform(sens,config.body)
 
-@recipe function f(h::Filtertrajectory)
+@recipe function f(h::Filtertrajectory;trajcolor=nothing)
 
   solhist, obs, vort_true = h.args
 
@@ -38,9 +38,10 @@ _physical_space_sensors(sens,config::VortexConfig{Bodies.ConformalBody}) = Bodie
   ratio := 1
   @series begin
     seriestype := :scatter
-    markersize --> 5
+    markersize --> 10
+    markershape := :star
     markerstrokecolor --> :black
-    markercolor --> :white
+    markercolor --> :grey
     label := "true"
     real(truez), imag(truez)
   end
@@ -72,7 +73,8 @@ _physical_space_sensors(sens,config::VortexConfig{Bodies.ConformalBody}) = Bodie
     @series begin
       seriestype := :scatter
       markersize --> 5
-      markercolor --> :blue
+      markercolor --> :gray
+      markerstrokecolor --> :gray
       label := "sensor"
       real.(sens), imag.(sens)
     end
@@ -89,24 +91,31 @@ _physical_space_sensors(sens,config::VortexConfig{Bodies.ConformalBody}) = Bodie
     #ζj = rj.*exp.(im*rΘj./rj)
     zj = bflag ? Elements.conftransform(zj,config.body) : zj
     xj, yj = real(zj), imag(zj)
+
+    this_trajcolor = isnothing(trajcolor) ? color_palette[j] : trajcolor
     @series begin
       seriestype := :path
       label := "traj of "*string(j)
-      color := color_palette[j]
+      color --> this_trajcolor
       xj, yj
     end
     @series begin
       seriestype := :scatter
-      markershape := :diamond
+      markershape := :circle
       label := "prior of "*string(j)
-      markercolor := color_palette[j]
+      markersize --> 5
+      markerstrokecolor --> this_trajcolor
+      markercolor --> :white
       [xj[1]], [yj[1]]
     end
     @series begin
       seriestype := :scatter
-      markershape := :star
+      markershape := :circle
+      markerstrokewidth := 0
+      #markercolor := :none
+      markersize --> 5
       label := "post of "*string(j)
-      markercolor := color_palette[j]
+      markercolor --> this_trajcolor
       [xj[end]], [yj[end]]
     end
 
