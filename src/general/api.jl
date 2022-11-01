@@ -1,24 +1,7 @@
-export vortexinference, gramians, adaptive_lowrank_enkf!, LowRankENKFSolution
+export vortexinference, gramians, adaptive_lowrank_enkf!
 
 
-struct LowRankENKFSolution{XT,YT,YYT,SIGXT,SIGYT,SYT,SXYT}
-   X :: XT
-   Xf :: XT
-   Y :: YYT
-   crit_ratio :: Float64
-   V :: AbstractMatrix{Float64}
-   U :: AbstractMatrix{Float64}
-   Λx :: Vector{Float64}
-   Λy :: Vector{Float64}
-   rx :: Int64
-   ry :: Int64
-   Σx :: SIGXT
-   Σy :: SIGYT
-   Y̆ :: YT
-   ΣY̆ :: SYT
-   ΣX̆Y̆ :: SXYT
-   yerr :: Float64
-end
+
 
 """
     vortexinference(ystar,xr::Tuple,yr::Tuple,Γr::Tuple,ϵmeas,ϵx,ϵy,ϵΓ,obs
@@ -35,7 +18,7 @@ in the circle plane (``r`` and ``\\theta``).
 function vortexinference(ystar,xr,yr,Γr,ϵmeas,ϵX,ϵY,ϵΓ,obs::AbstractObservationOperator{Nx,Ny};linear_flag=true,Ne=50,maxiter=50,numsample=5,crit_ratio=1.0,β=1.02,inflate=true,errtol=1.0) where {Nx,Ny}
     @unpack config = obs
     @unpack Nv = config
-    sol_collection = []
+    sol_collection = Vector{LowRankENKFSolution}[]
 
     Σϵ = Diagonal(ϵmeas^2*ones(Ny))
     Σx = Diagonal(vcat(ϵX^2*ones(Nv),ϵY^2*ones(Nv),ϵΓ^2*ones(Nv)))
@@ -57,7 +40,7 @@ function vortexinference(ystar,xr,yr,Γr,ϵmeas,ϵX,ϵY,ϵΓ,obs::AbstractObserv
         ry_set = min(size(X0,1),Ny)
 
         # Initialize history
-        solhist = []
+        solhist = LowRankENKFSolution[]
 
         for i = 1:maxiter
             sol = adaptive_lowrank_enkf!(X,Σx,Y,Σϵ,ystar,obs; linear_flag=linear_flag,crit_ratio=crit_ratio, rxdefault = rx_set, rydefault = ry_set, inflate=inflate, β = β)

@@ -4,10 +4,9 @@ import Statistics: cov, mean, std, var
 
 import LinearAlgebra: norm
 
-export BasicEnsembleMatrix, create_ensemble, ensemble_perturb, whiten,
+export create_ensemble, ensemble_perturb, whiten,
         additive_inflation!, multiplicative_inflation!
 
-abstract type EnsembleMatrix{Nx,Ne,T} <: AbstractMatrix{T} end
 
 
 # basic operations on ensembles
@@ -18,29 +17,7 @@ getindex(X::EnsembleMatrix,I...) = getindex(X.X,I...)
 eltype(X::EnsembleMatrix) = eltype(X.X)
 
 
-"""
-    BasicEnsembleMatrix{Nx,Ne}
 
-A type which holds data ensembles of size `Nx` x `Ne`, where `Nx`
-is the dimension of the data vectors and `Ne` the size of the
-ensemble.
-"""
-struct BasicEnsembleMatrix{Nx,Ne,T,XT} <: EnsembleMatrix{Nx,Ne,T}
-    X :: XT
-    BasicEnsembleMatrix(X::XT) where {XT<:AbstractMatrix} =
-        new{size(X,1),size(X,2),eltype(X),XT}(X)
-end
-
-similar(X::BasicEnsembleMatrix;element_type=eltype(X),dims=size(X)) = BasicEnsembleMatrix(Array{element_type}(undef, dims...))
-
-BasicEnsembleMatrix(X::BasicEnsembleMatrix,a...) = X
-
-(X::BasicEnsembleMatrix)(i::Int) = view(X.X,:,i)
-
-function Base.show(io::IO,m::MIME"text/plain",X::BasicEnsembleMatrix{Nx,Ne}) where {Nx,Ne}
-  println(io,"Ensemble with $Ne members of $Nx-dimensional data")
-  show(io,m,X.X)
-end
 
 
 """

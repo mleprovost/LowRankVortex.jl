@@ -1,9 +1,10 @@
-using RecipesBase
+#using RecipesBase
 using ColorTypes
+using MakieCore
+using LaTeXStrings
 
 export color_palette
 
-setmarkersize(x::Float64) = 5 + x*4
 
 """
 A palette of colors for plotting
@@ -18,10 +19,84 @@ const color_palette = [colorant"firebrick";
                        colorant"grey70";
                        colorant"dodgerblue4"]
 
-@userplot Filtertrajectory
+#const color_palette2 = cgrad(:tab20, 10, categorical = true)
+
 
 _physical_space_sensors(sens,config) = sens
 _physical_space_sensors(sens,config::VortexConfig{Bodies.ConformalBody}) = Bodies.conftransform(sens,config.body)
+setmarkersize(x::Float64) = 5 + x*4
+
+
+function trajectory_theme()
+    MakieCore.Theme(
+        fontsize=16,
+        Axis=(xlabel=L"x", ylabel=L"y",limits=((-2,2),(-1,2)),aspect=1),
+        resolution=(500,400)
+    )
+end
+
+
+MakieCore.@recipe(Trajectory, x, y) do scene
+    MakieCore.Attributes(
+        color = :black
+    )
+end
+
+MakieCore.@recipe(Trajectory3d, x, y, z) do scene
+    MakieCore.Attributes(
+        color = :black
+    )
+end
+
+function MakieCore.convert_arguments(P::Union{Type{<:LowRankVortex.Trajectory},Type{<:LowRankVortex.Trajectory3d}}, solhist::Vector{<:Any}, obs::AbstractObservationOperator)
+    config = obs.config
+    Nv = config.Nv
+    x = []
+    y = []
+    Γ = []
+    for j in 1:Nv
+      zj = map(x -> state_to_positions_and_strengths(mean(x.Xf),config)[1][j],solhist)
+      xj, yj = real(zj), imag(zj)
+      push!(x,copy(xj))
+      push!(y,copy(yj))
+      Γj = map(x -> state_to_positions_and_strengths(mean(x.Xf),config)[2][j],solhist)
+      push!(Γ,copy(Γj))
+    end
+    return x,y,Γ
+end
+
+
+function MakieCore.plot!(trajectory::Trajectory)
+    x,y = trajectory[:x], trajectory[:y]
+    for j in eachindex(x.val)
+      xj, yj = x.val[j], y.val[j]
+      l1 = lines!(trajectory,xj,yj,color=trajectory[:color])
+      l2 = scatter!(trajectory,[xj[1]],[yj[1]])
+      l2.color=:transparent
+      l2.strokewidth=1
+      l2.markersize=10
+      l2.strokecolor=l1.attributes[:color]
+      l3 = scatter!(trajectory,[xj[end]],[yj[end]],color=l1.attributes[:color])
+    end
+    trajectory
+end
+
+
+
+function MakieCore.plot!(trajectory::Trajectory3d)
+    x,y,z = trajectory[:x], trajectory[:y], trajectory[:z]
+    l1 = lines!(trajectory,x,y,z,color=trajectory[:color])
+    l2 = scatter!(trajectory,[x.val[1]],[y.val[1]],[z.val[1]])
+    l2.color=:transparent
+    l2.strokewidth=1
+    l2.markersize=10
+    l2.strokecolor=l1.attributes[:color]
+    l3 = scatter!(trajectory,[x.val[end]],[y.val[end]],[z.val[end]],color=l1.attributes[:color])
+    trajectory
+end
+
+#=
+@userplot Filtertrajectory
 
 @recipe function f(h::Filtertrajectory;trajcolor=nothing)
 
@@ -55,17 +130,6 @@ _physical_space_sensors(sens,config::VortexConfig{Bodies.ConformalBody}) = Bodie
     end
   end
 
-  #=
-  @series begin
-    seriestype := :scatter
-    markersize --> 5
-    markershape --> :utriangle
-    markerstrokecolor --> :black
-    markercolor --> :black
-    label := "true centroid"
-    [real(true_center)], [imag(true_center)]
-  end
-  =#
 
   if hasfield(typeof(obs),:sens)
     sens = _physical_space_sensors(obs.sens,config)
@@ -303,12 +367,6 @@ end
         Umode
       end
 
-    #=
-    p1 = scatter(real.(zv_j).+V[1:2:2Nv,mode],imag.(zv_j).+V[2:2:2Nv,mode],markersize=setmarkersize.(V[2Nv+1:3Nv,mode]),legend=false,markercolor=:gray)
-scatter!(p1,real.(zv_j),imag.(zv_j),markersize=5)
-quiver!(p1,real.(zv_j),imag.(zv_j),quiver=(V[1:2:2Nv,mode],V[2:2:2Nv,mode]),ratio=1,legend=:false,color=:black,xlim=(-1.5,1.5),ylim=(-1.5,1.5),size=(300,300))
-p2 = plot(U[:,mode],legend=false,size=(800,250))
-p3 = plot(p1,p2)
-    =#
 
 end
+=#

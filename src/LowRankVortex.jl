@@ -34,8 +34,8 @@ include("localized_senkf_symmetric_vortexassim.jl")
 include("lowrankenkf_vortexassim.jl")
 include("lowrankenkf_symmetric_vortexassim.jl")
 include("adaptive_lowrankenkf_symmetric_vortexassim.jl")
-include("plot_recipes.jl")
 
+include("general/types.jl")
 include("general/ensemble.jl")
 include("general/observation.jl")
 include("general/pressure_utilities.jl")
@@ -43,6 +43,8 @@ include("general/state_utilities.jl")
 include("general/jacobian.jl")
 include("general/vortex.jl")
 include("general/api.jl")
+include("general/classification.jl")
+
 
 
 # Point vortices about a circular cylinder
@@ -57,6 +59,7 @@ include("cylinder/localized_senkf_cylinder_vortexassim.jl")
 include("cylinder/adaptive_lowrankenkf_cylinder_vortexassim.jl")
 
 
+include("plot_recipes.jl")
 
 
 

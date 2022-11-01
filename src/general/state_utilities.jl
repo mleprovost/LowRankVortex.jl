@@ -1,4 +1,49 @@
-export lagrange_to_state_reordered, state_to_lagrange_reordered, state_to_positions_and_strengths
+export lagrange_to_state_reordered, state_to_lagrange_reordered, state_to_positions_and_strengths,
+        state_to_vortex_states, states_to_vortex_states, collect_estimated_states
+
+function collect_estimated_states(collection::Vector{Vector{T}},config::VortexConfig) where {T <: LowRankENKFSolution}
+    Nv = config.Nv
+    #xarray = zeros(3,config.Nv*length(collection))
+    xarray = zeros(3*config.Nv,length(collection))
+
+    for j in eachindex(collection)
+        solhist = collection[j]
+        laststate = solhist[end]
+        #xarray[:,(j-1)*Nv+1:j*Nv] = state_to_vortex_states(mean(laststate.X),config)
+        xarray[:,j] = mean(laststate.X)
+    end
+    return xarray
+end
+
+"""
+    states_to_vortex_states(state_array::Matrix,config::VortexConfig)
+
+Take an array of states (3Nv x nstates) and convert it to a (3 x Nv*nstates) array
+of individual vortex states.
+"""
+function states_to_vortex_states(state_array::Matrix{Float64}, config::VortexConfig)
+   Nv = config.Nv
+   ndim, nstates = size(state_array)
+   vortex_array = zeros(3,Nv*nstates)
+   for j in 1:nstates
+     vortexstatej = state_to_vortex_states(state_array[:,j],config)
+     vortex_array[:,(j-1)*Nv+1:j*Nv] = vortexstatej
+   end
+   return vortex_array
+end
+
+index_of_vortex_state(v::Int,config::VortexConfig) = (v-1)÷config.Nv+1
+
+function state_to_vortex_states(state::AbstractVector{Float64}, config::VortexConfig)
+    zv, Γv = state_to_positions_and_strengths(state,config)
+    Nv = length(state) ÷ 3
+    xarray = zeros(3,Nv)
+    for v in 1:Nv
+        xarray[:,v] .= [real(zv[v]),imag(zv[v]),Γv[v]]
+        #push!(xarray,[real(zv[v]),imag(zv[v]),Γv[v]])
+    end
+    return xarray
+end
 
 function lagrange_to_state_reordered(source::Vector{T}, config::VortexConfig) where T <: PotentialFlow.Element
     Nv = length(source)
