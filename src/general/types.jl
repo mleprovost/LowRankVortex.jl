@@ -1,6 +1,8 @@
-export LowRankENKFSolution, BasicEnsembleMatrix
+export LowRankENKFSolution, ENKFSolution, BasicEnsembleMatrix
 
 abstract type EnsembleMatrix{Nx,Ne,T} <: AbstractMatrix{T} end
+
+abstract type AbstractENKFSolution end
 
 
 """
@@ -28,7 +30,7 @@ function Base.show(io::IO,m::MIME"text/plain",X::BasicEnsembleMatrix{Nx,Ne}) whe
 end
 
 
-struct LowRankENKFSolution{XT,YT,YYT,SIGXT,SIGYT,SYT,SXYT}
+struct LowRankENKFSolution{XT,YT,YYT,SIGXT,SIGYT,SYT,SXYT} <: AbstractENKFSolution
    X :: XT
    Xf :: XT
    Y :: YYT
@@ -39,6 +41,18 @@ struct LowRankENKFSolution{XT,YT,YYT,SIGXT,SIGYT,SYT,SXYT}
    Λy :: Vector{Float64}
    rx :: Int64
    ry :: Int64
+   Σx :: SIGXT
+   Σy :: SIGYT
+   Y̆ :: YT
+   ΣY̆ :: SYT
+   ΣX̆Y̆ :: SXYT
+   yerr :: Float64
+end
+
+struct ENKFSolution{XT,YT,YYT,SIGXT,SIGYT,SYT,SXYT} <: AbstractENKFSolution
+   X :: XT
+   Xf :: XT
+   Y :: YYT
    Σx :: SIGXT
    Σy :: SIGYT
    Y̆ :: YT

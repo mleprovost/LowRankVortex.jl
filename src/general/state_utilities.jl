@@ -1,7 +1,7 @@
 export lagrange_to_state_reordered, state_to_lagrange_reordered, state_to_positions_and_strengths,
         state_to_vortex_states, states_to_vortex_states, collect_estimated_states
 
-function collect_estimated_states(collection::Vector{Vector{T}},config::VortexConfig) where {T <: LowRankENKFSolution}
+function collect_estimated_states(collection::Vector{Vector{T}},config::VortexConfig) where {T <: AbstractENKFSolution}
     Nv = config.Nv
     #xarray = zeros(3,config.Nv*length(collection))
     xarray = zeros(3*config.Nv,length(collection))
@@ -39,12 +39,23 @@ function state_to_vortex_states(state::AbstractVector{Float64}, config::VortexCo
     Nv = length(state) ÷ 3
     xarray = zeros(3,Nv)
     for v in 1:Nv
-        xarray[:,v] .= [real(zv[v]),imag(zv[v]),Γv[v]]
+        zv_v = vortex_position_to_phys_space(zv[v],config)
+        xarray[:,v] .= [real(zv_v),imag(zv_v),Γv[v]]
         #push!(xarray,[real(zv[v]),imag(zv[v]),Γv[v]])
     end
     return xarray
 end
 
+vortex_position_to_phys_space(zj,config::VortexConfig) = zj
+vortex_position_to_phys_space(zj,config::VortexConfig{Bodies.ConformalBody}) = Elements.conftransform(zj,config.body)
+
+"""
+    lagrange_to_state_reordered(source::Vector{Element},config::VortexConfig) -> Vector{Float64}
+
+Convert a set of point or blob vortex elements `source` to a state vector.
+If this is a problem with a `ConformalBody`, then it assumes that the
+element positions in `source` are in the circle plane.
+"""
 function lagrange_to_state_reordered(source::Vector{T}, config::VortexConfig) where T <: PotentialFlow.Element
     Nv = length(source)
 
@@ -78,7 +89,12 @@ function lagrange_to_state_reordered(source::Vector{T}, config::VortexConfig{Bod
     return states
 end
 
+"""
+    state_to_lagrange_reordered(state::AbstractVector,config::VortexConfig[;isblob=true]) -> Vector{Element}
 
+Convert a state vector `state` to a vector of vortex elements. If this is a problem with
+a `ConformalBody`, then the element positions are given in the circle plane.
+"""
 function state_to_lagrange_reordered(state::AbstractVector{Float64}, config::VortexConfig; isblob::Bool=true)
 
     zv, Γv = state_to_positions_and_strengths(state,config)
@@ -94,6 +110,13 @@ function state_to_lagrange_reordered(state::AbstractVector{Float64}, config::Vor
     end
 end
 
+"""
+    state_to_positions_and_strengths(state::AbstractVector,config::VortexConfig) -> Vector{ComplexF64}, Vector{Float64}
+
+Convert the state vector `state` to vectors of positions and strengths. If
+this is a problem with a `ConformalBody`, then it returns the positions in
+the circle plane.
+"""
 function state_to_positions_and_strengths(state::AbstractVector{Float64}, config::VortexConfig{Bodies.ConformalBody})
   Nv = length(state) ÷ 3
 

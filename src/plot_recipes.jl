@@ -22,8 +22,6 @@ const color_palette = [colorant"firebrick";
 #const color_palette2 = cgrad(:tab20, 10, categorical = true)
 
 
-_physical_space_sensors(sens,config) = sens
-_physical_space_sensors(sens,config::VortexConfig{Bodies.ConformalBody}) = Bodies.conftransform(sens,config.body)
 setmarkersize(x::Float64) = 5 + x*4
 
 
@@ -51,9 +49,18 @@ end
 function MakieCore.convert_arguments(P::Union{Type{<:LowRankVortex.Trajectory},Type{<:LowRankVortex.Trajectory3d}}, solhist::Vector{<:Any}, obs::AbstractObservationOperator)
     config = obs.config
     Nv = config.Nv
-    x = []
-    y = []
-    Γ = []
+    x = [Float64[] for j in 1:Nv]
+    y = [Float64[] for j in 1:Nv]
+    Γ = [Float64[] for j in 1:Nv]
+    for sol in solhist
+      xt =  state_to_vortex_states(mean(sol.Xf),config)
+      for j in 1:Nv
+        push!(x[j],xt[1,j])
+        push!(y[j],xt[2,j])
+        push!(Γ[j],xt[3,j])
+      end
+    end
+    #=
     for j in 1:Nv
       zj = map(x -> state_to_positions_and_strengths(mean(x.Xf),config)[1][j],solhist)
       xj, yj = real(zj), imag(zj)
@@ -62,6 +69,7 @@ function MakieCore.convert_arguments(P::Union{Type{<:LowRankVortex.Trajectory},T
       Γj = map(x -> state_to_positions_and_strengths(mean(x.Xf),config)[2][j],solhist)
       push!(Γ,copy(Γj))
     end
+    =#
     return x,y,Γ
 end
 
@@ -132,7 +140,7 @@ end
 
 
   if hasfield(typeof(obs),:sens)
-    sens = _physical_space_sensors(obs.sens,config)
+    sens = physical_space_sensors(obs)
 
     @series begin
       seriestype := :scatter

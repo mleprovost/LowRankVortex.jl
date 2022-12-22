@@ -20,13 +20,13 @@ analytical_pressure(z,v::Vector{T},config::VortexConfig{DataType}) where {T<:Ele
 # This function expects to get the evaluation points and vortex elements in the circle plane
 function analytical_pressure(ζ,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
 
-  return Bodies.pressure(ζ,v_ζ,b)
+  return Bodies.pressure(ζ,v_ζ,b;kwargs...)
 
 end
 
 function analytical_dpdζv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
 
-  return Bodies.dpdζv(ζ,l,v_ζ,b)
+  return Bodies.dpdζv(ζ,l,v_ζ,b;kwargs...)
 
 end
 
@@ -34,13 +34,13 @@ function analytical_dpdzv(ζ,l::Integer,v::Vector{T},b::Bodies.ConformalBody;kwa
 
   # map elements to circle plane
   v_ζ = Elements.inverse_conftransform(v,b)
-  return Bodies.dpdzv(ζ,l,v_ζ,b)
+  return Bodies.dpdzv(ζ,l,v_ζ,b;kwargs...)
 
 end
 
 function analytical_dpdΓv(ζ,l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
 
-  return Bodies.dpdΓv(ζ,l,v_ζ,b)
+  return Bodies.dpdΓv(ζ,l,v_ζ,b;kwargs...)
 
 end
 
@@ -54,7 +54,7 @@ end
 
 function analytical_dfdζv(l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
 
-  dfx, dfy, dmr = Bodies.dfdζv(l,v_ζ,b)
+  dfx, dfy, dmr = Bodies.dfdζv(l,v_ζ,b;kwargs...)
 
   return [dfx, dfy, dmr]
 
@@ -62,7 +62,7 @@ end
 
 function analytical_dfdΓv(l::Integer,v_ζ::Vector{T},b::Bodies.ConformalBody;kwargs...) where {T<:Element}
 
-  dfx, dfy, dmr = Bodies.dfdΓv(l,v_ζ,b)
+  dfx, dfy, dmr = Bodies.dfdΓv(l,v_ζ,b;kwargs...)
 
   return [dfx, dfy, dmr]
 

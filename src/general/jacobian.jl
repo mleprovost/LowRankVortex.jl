@@ -3,7 +3,7 @@ export analytical_pressure_jacobian!, analytical_force_jacobian!
 analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where T <: PotentialFlow.Element =
 			analytical_pressure_jacobian!(J,target,source,config.body;kwargs...)
 
-analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64},source::Vector{T},config::VortexConfig{DataType}) where {T <: PotentialFlow.Element,WT} =
+analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64},source::Vector{T},config::VortexConfig{DataType}) where {T <: PotentialFlow.Element} =
     analytical_pressure_jacobian!(J,target,source;ϵ=config.δ,walltype=config.body)
 
 analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T},config::VortexConfig;kwargs...) where T <: PotentialFlow.Element =

@@ -14,18 +14,10 @@ A structure to hold the parameters of the vortex simulations
 
 ## Fields
 - `Nv::Int64`: number of vortices
+- `body::ConformalBody` : body (if present)
 - `U::ComplexF64`: freestream velocity
-- `ss::Array{ComplexF64,1}`: sensor locations
 - `Δt::Float64`: time step
 - `δ::Float64` : blob radius
-
-- `ϵX::Float64`: position noise std
-- `ϵΓ::Float64`: circulation noise std
-
-- `β::Float64`: multiplicative inflation
-
-- `ϵY::Float64`: standard deviation of the observation noise
-
 - `advect_flag::Bool`: true if the vortex system should be advected
 """
 struct VortexConfig{BT,ST}
@@ -39,7 +31,7 @@ struct VortexConfig{BT,ST}
     "Freestream velocity"
     U::ComplexF64
 
-    "Sensor locations"
+    "Sensor locations" # this is not used anymore
     ss::ST
 
     "Time step"
@@ -48,16 +40,16 @@ struct VortexConfig{BT,ST}
     "Blob radius"
     δ::Float64
 
-    "Position noise std"
+    "Position noise std" # Not used anymore
     ϵX::Float64
 
-    "Circulation noise std"
+    "Circulation noise std" # Not used anymore
     ϵΓ::Float64
 
-    "Multiplicative inflation"
+    "Multiplicative inflation" # Not used anymore
     β::Float64
 
-    "Observation noise std"
+    "Observation noise std" # Not used anymore
     ϵY::Float64
 
     "Advect flag"

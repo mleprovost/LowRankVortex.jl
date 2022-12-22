@@ -5,7 +5,7 @@
 # Nx is number of states, Ny is number of observations
 
 export observations!, observations, AbstractObservationOperator, jacob!,
-        PressureObservations, ForceObservations
+        PressureObservations, ForceObservations, physical_space_sensors
 
 abstract type AbstractObservationOperator{Nx,Ny} end
 
@@ -46,6 +46,13 @@ struct PressureObservations{Nx,Ny,ST,CT} <: LowRankVortex.AbstractObservationOpe
     config::CT
 end
 
+"""
+    PressureObservations(sens::AbstractVector,config::VortexConfig)
+
+Constructor to create an instance of pressure sensors. The locations of the
+sensors are specified by `sens`, which should be given as a vector of
+complex coordinates.
+"""
 function PressureObservations(sens::AbstractVector,config::VortexConfig)
     return PressureObservations{3*config.Nv,length(sens),typeof(sens),typeof(config)}(sens,config)
 end
@@ -53,14 +60,28 @@ end
 function observations(x::AbstractVector,obs::PressureObservations)
   @unpack config, sens = obs
   v = state_to_lagrange_reordered(x,config)
-  return analytical_pressure(sens,v,config)
+  return _pressure(sens,v,config)
 end
 
 function jacob!(J,x::AbstractVector,obs::PressureObservations)
     @unpack config, sens = obs
     v = state_to_lagrange_reordered(x,config)
-    analytical_pressure_jacobian!(J,sens,v,config)
+    return _pressure_jacobian!(J,sens,v,config)
 end
+
+_pressure(sens,v,config::VortexConfig{Bodies.ConformalBody}) = analytical_pressure(sens,v,config;preserve_circ=false)
+_pressure(sens,v,config::VortexConfig) = analytical_pressure(sens,v,config)
+
+_pressure_jacobian!(J,sens,v,config::VortexConfig{Bodies.ConformalBody}) = analytical_pressure_jacobian!(J,sens,v,config;preserve_circ=false)
+_pressure_jacobian!(J,sens,v,config::VortexConfig) = analytical_pressure_jacobian!(J,sens,v,config)
+
+
+physical_space_sensors(obs::PressureObservations) = physical_space_sensors(obs.sens,obs.config)
+physical_space_sensors(sens,config::VortexConfig) = sens
+physical_space_sensors(sens,config::VortexConfig{Bodies.ConformalBody}) = physical_space_sensors(sens,config.body)
+physical_space_sensors(sens,body::Bodies.ConformalBody) = Bodies.conftransform(sens,body)
+
+
 
 # Force
 
@@ -68,6 +89,11 @@ struct ForceObservations{Nx,Ny,CT} <: LowRankVortex.AbstractObservationOperator{
     config::CT
 end
 
+"""
+    ForceObservations(config::VortexConfig)
+
+Constructor to create an instance of force sensing.
+"""
 function ForceObservations(config::VortexConfig)
     return ForceObservations{3*config.Nv,3,typeof(config)}(config)
 end

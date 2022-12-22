@@ -1,5 +1,4 @@
-export vortexinference, gramians, adaptive_lowrank_enkf!
-
+export vortexinference, gramians, adaptive_lowrank_enkf!, senkf!
 
 
 
@@ -15,17 +14,23 @@ and will run for `maxiter` iterations. For `ConformalBody` problems,
 `xr`, `yr` and `ϵx`, `ϵy` should be interpreted as describing the generalized state components
 in the circle plane (``r`` and ``\\theta``).
 """
-function vortexinference(ystar,xr,yr,Γr,ϵmeas,ϵX,ϵY,ϵΓ,obs::AbstractObservationOperator{Nx,Ny};linear_flag=true,Ne=50,maxiter=50,numsample=5,crit_ratio=1.0,β=1.02,inflate=true,errtol=1.0) where {Nx,Ny}
+function vortexinference(ystar,xr,yr,Γr,ϵmeas,ϵX,ϵY,ϵΓ,obs::AbstractObservationOperator{Nx,Ny};linear_flag=true,Ne=50,maxiter=50,numsample=5,
+                                                                                               lowrank=true,crit_ratio=1.0,β=1.02,inflate=true,errtol=1.0) where {Nx,Ny}
     @unpack config = obs
     @unpack Nv = config
-    sol_collection = Vector{LowRankENKFSolution}[]
+
+    soltype = lowrank ? LowRankENKFSolution : ENKFSolution
+
+    sol_collection = Vector{soltype}[]
 
     Σϵ = Diagonal(ϵmeas^2*ones(Ny))
     Σx = Diagonal(vcat(ϵX^2*ones(Nv),ϵY^2*ones(Nv),ϵΓ^2*ones(Nv)))
 
-    lk = ReentrantLock()
+    #lk = ReentrantLock()
 
-    Threads.@threads for i in 1:numsample
+    #Threads.@threads for i in 1:numsample
+    for i in 1:numsample
+
         # things to do for every sample from prior
 
         # generate new sample
@@ -40,19 +45,25 @@ function vortexinference(ystar,xr,yr,Γr,ϵmeas,ϵX,ϵY,ϵΓ,obs::AbstractObserv
         ry_set = min(size(X0,1),Ny)
 
         # Initialize history
-        solhist = LowRankENKFSolution[]
+        solhist = soltype[]
 
         for i = 1:maxiter
-            sol = adaptive_lowrank_enkf!(X,Σx,Y,Σϵ,ystar,obs; linear_flag=linear_flag,crit_ratio=crit_ratio, rxdefault = rx_set, rydefault = ry_set, inflate=inflate, β = β)
+            if lowrank
+              sol = adaptive_lowrank_enkf!(X,Σx,Y,Σϵ,ystar,obs; linear_flag=linear_flag,crit_ratio=crit_ratio, rxdefault = rx_set, rydefault = ry_set, inflate=inflate, β = β)
+            else
+              sol = senkf!(X,Σx,Y,Σϵ,ystar,obs; inflate=inflate, β = β)
+            end
             #ϵX = min(0.01*sol.yerr,0.05)
             #ϵΓ = min(0.01*sol.yerr,0.05)
             #Σx = Diagonal(vcat(ϵX^2*ones(Nv),ϵX^2*ones(Nv),ϵΓ^2*ones(Nv)));
             push!(solhist,deepcopy(sol))
             sol.yerr < errtol && break
         end
-        lock(lk) do
-          push!(sol_collection,deepcopy(solhist))
-        end
+        #lock(lk) do
+        #  push!(sol_collection,deepcopy(solhist))
+        #end
+        push!(sol_collection,deepcopy(solhist))
+
     end
     return sol_collection
 
@@ -203,6 +214,43 @@ function adaptive_lowrank_enkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y::BasicEnsemb
     X .+= sqrt_Σx*Vr*ΣX̆Y̆*(ΣY̆\Y̆)
 
     soln = LowRankENKFSolution(X,Xf,Y,crit_ratio,V,U,Λx,Λy,rx,ry,Σx,Σϵ,Y̆,ΣY̆,ΣX̆Y̆,yerr)
+
+    return soln
+end
+
+"""
+      senkf!(X,Σx,Y,Σϵ,ystar,obs)
+"""
+function senkf!(X::BasicEnsembleMatrix{Nx,Ne},Σx,Y::BasicEnsembleMatrix{Ny,Ne},Σϵ,ystar,obs::AbstractObservationOperator{Nx,Ny};
+                   inflate=true,β=1.0) where {Nx,Ny,Ne}
+    inflate && additive_inflation!(X,Σx)
+    inflate && multiplicative_inflation!(X,β)
+    observations!(Y,X,obs)
+    ϵ = create_ensemble(Ne,zeros(Ny),Σϵ)
+    Xf = deepcopy(X)
+
+    # Calculate error
+    yerr = norm(ystar-mean(Y),Σϵ)
+    #yerr = norm(ystar-Y+ϵ,Σϵ)
+
+    # calculate the innovation, plus measurement noise
+    innov = ystar - Y + ϵ
+    Y̆ = innov
+
+    X̆p = whiten(X,Σx)
+    HX̆p = whiten(Y,Σϵ)
+    ϵ̆p = whiten(ϵ,Σϵ)
+
+    CHH = cov(HX̆p)
+    Cee = cov(ϵ̆p)
+
+    ΣY̆ = CHH + Cee
+    ΣX̆Y̆ = cov(X̆p,HX̆p) # should be analogous to Λ
+
+    sqrt_Σx = sqrt(Σx)
+    X .+= ΣX̆Y̆*(ΣY̆\Y̆)
+
+    soln = ENKFSolution(X,Xf,Y,Σx,Σϵ,Y̆,ΣY̆,ΣX̆Y̆,yerr)
 
     return soln
 end
