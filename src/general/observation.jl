@@ -5,9 +5,22 @@
 # Nx is number of states, Ny is number of observations
 
 export observations!, observations, AbstractObservationOperator, jacob!,
-        PressureObservations, ForceObservations, physical_space_sensors
+        PressureObservations, ForceObservations, physical_space_sensors,
+        loglikelihood
 
 abstract type AbstractObservationOperator{Nx,Ny} end
+
+"""
+    loglikelihood(x,ystar,Σϵ,obs) -> Float64
+
+For a given state `x`, return the log of the likelihood function,
+given observations `ystar`, noise covariance `Σϵ`, and observation structure `obs`.
+"""
+function loglikelihood(x,ystar,Σϵ,obs::AbstractObservationOperator)
+    y = observations(x,obs)
+    loss = norm(ystar-y,Σϵ)
+    return -loss^2/2
+end
 
 """
     observations(x::AbstractVector,obs::AbstractObservationOperator) -> X

@@ -14,8 +14,9 @@ ensemble.
 """
 struct BasicEnsembleMatrix{Nx,Ne,T,XT} <: EnsembleMatrix{Nx,Ne,T}
     X :: XT
-    BasicEnsembleMatrix(X::XT) where {XT<:AbstractMatrix} =
-        new{size(X,1),size(X,2),eltype(X),XT}(X)
+    burnin :: Integer
+    BasicEnsembleMatrix(X::XT;burnin=1) where {XT<:AbstractMatrix} =
+        new{size(X,1),size(X,2),eltype(X),XT}(X,burnin)
 end
 
 similar(X::BasicEnsembleMatrix;element_type=eltype(X),dims=size(X)) = BasicEnsembleMatrix(Array{element_type}(undef, dims...))

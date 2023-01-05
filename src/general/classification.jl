@@ -1,12 +1,23 @@
 using Clustering
 
-export classify_by_yerr, classify_by_density
+export classify_by_data_mismatch, classify_by_density, metropolis
 
+"""
+    classify_by_data_mismatch(collection::Vector{Vector{AbstractENKFSolution}},obs::AbstractObservationOperator[;kluster=5,min_cluster_size=1,cluster_choice=nothing])
 
-function classify_by_yerr(sol_collection::Vector{Vector{T}},obs::AbstractObservationOperator;
+From a given collection of iterative ENKF solution trajectories, inspect
+the final sqrt(data mismatch) of each trajectory and use this to perform K-means clustering
+to classify them into different clusters. Return the cluster with the
+lowest data mismatch. The routine returns a tuple of the indices of `collection` that
+belong to this lowest-mismatch cluster, the sqrt(data mismatch) of this cluster,
+and a vector of the final sqrt(data mismatch) for the entire collection.
+The number of clusters is `kcluster`. If `cluster_choice` is set to an integer <= `kcluster`,
+then it chooses this cluster to return indices for. If the lowest-mismatch cluster
+has fewer than `min_cluster_size` members, then it throws an error.
+"""
+function classify_by_data_mismatch(sol_collection::Vector{Vector{T}},obs::AbstractObservationOperator;
                             kcluster::Int = 5,
-                            mincount::Int = 1,
-                            maxerr::Float64 = 1.0e2,
+                            min_cluster_size::Int = 1,
                             cluster_choice = nothing) where T <: AbstractENKFSolution
 
   # get the final y errors of each trajectory
@@ -24,16 +35,24 @@ function classify_by_yerr(sol_collection::Vector{Vector{T}},obs::AbstractObserva
     minyerr = R.centers[idex]
   end
   cnts = counts(R)
-  cnts[idex] >= mincount || error("Lowest-error group is not large enough")
-
+  cnts[idex] >= min_cluster_size || error("Lowest-error group is not large enough")
 
   # get the indices of the members of the lowest-error group (goodones)
-  goodones = findall(x -> x == idex,assignments(R))
+  member_indices = findall(x -> x == idex,assignments(R))
 
-  return sol_collection[goodones], minyerr, collection_yerr, goodones
+  return member_indices, minyerr, collection_yerr
 
 end
 
+"""
+    classify_by_density(collection::Vector{Vector{AbstractENKFSolution}},obs::AbstractObservationOperator[;cluster_size=0.05,min_cluster_size=1])
+
+From a given collection of iterative ENKF solution trajectories, collect the
+final mean states of each trajectory, re-arrange these into a list of 3-dimensional vortex
+element states, and classify these by density using the dbscan algorithm. Find
+the largest cluster and return the indices of the collection members
+that each vortex in the largest cluster belongs to.
+"""
 function classify_by_density(sol_collection::Vector{Vector{T}},obs::AbstractObservationOperator;
                              cluster_size::Float64 = 0.05, min_cluster_size = 1, kwargs...) where T <: AbstractENKFSolution
 
@@ -49,13 +68,56 @@ function classify_by_density(sol_collection::Vector{Vector{T}},obs::AbstractObse
   # find the largest cluster
   cnt, idx = findmax(x -> x.size,db)
   biggest_vortex_cluster = db[idx].core_indices
-  clustermembers = Int[]
+  member_indices = Int[]
   for v in biggest_vortex_cluster
     state_index = index_of_vortex_state(v,obs.config)
-    push!(clustermembers,state_index)
+    push!(member_indices,state_index)
   end
-  sol_goodones = sol_collection[clustermembers]
 
-  return sol_goodones, length(biggest_vortex_cluster)
+  return member_indices
 
+end
+
+"""
+    mhstep(zn) -> Vector{Number}
+
+Given initial sample, generates new sample znp1, according to Metropolis-Hastings
+algorithm
+"""
+function mhstep(zn::Vector{Float64},logp̃::Function,propvar)
+    q = MvNormal(zn,propvar)
+    z_trial = rand(q)
+    logp_zn = logp̃(zn)
+    logp_trial = logp̃(z_trial)
+    accept = min(0.0,logp_trial-logp_zn) > log(rand())
+
+    znp1 = copy(zn)
+    if accept
+        znp1 .= z_trial
+    end
+    return znp1, accept
+end
+
+"""
+    metropolis(zi::Vector,nsamp,p̃::Distribution;propvar=1.0) -> BasicEnsembleMatrix
+
+Given an initial trial `zi`, carry out `nsamp` Metropolis-Hastings steps with
+the unscaled distribution `p̃`. The proposal distribution is Gaussian, centered
+at each step's starting value, with a variance of `propvar`.
+"""
+function metropolis(zi::Vector{Float64},nsamp::Integer,logp̃::Function;propvar=1.0,burnin=max(1,floor(Int,nsamp/2)))
+    z = copy(zi)
+    z_chain = zeros(length(z),nsamp-burnin+1)
+    accept_chain = zeros(Bool,nsamp-burnin+1)
+    logp_chain = zeros(Float64,nsamp-burnin+1)
+    for i in 1:burnin
+        z, accept = mhstep(z,logp̃,propvar)
+    end
+    for i in 1:nsamp-burnin+1
+        z, accept = mhstep(z,logp̃,propvar)
+        z_chain[:,i] = z
+        accept_chain[i] = accept
+        logp_chain[i] = logp̃(z)
+    end
+    return BasicEnsembleMatrix(z_chain), accept_chain, logp_chain
 end

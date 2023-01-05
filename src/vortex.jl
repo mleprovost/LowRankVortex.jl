@@ -1,4 +1,4 @@
-export VortexConfig, state_to_lagrange, lagrange_to_state
+export VortexConfig, state_to_lagrange, lagrange_to_state, statelength
 
 
 abstract type ImageType end
@@ -61,6 +61,9 @@ VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY;advect_flag=true,body=nothing) = Vor
 
 VortexConfig(Nv,δ;body=nothing) = VortexConfig(Nv,body,complex(0.0),ComplexF64[],0.0,δ,0.0,0.0,0.0,0.0,false)
 VortexConfig(Nv,U,Δt,δ;advect_flag=true,body=nothing) = VortexConfig(Nv,body,U,ComplexF64[],Δt,δ,0.0,0.0,0.0,0.0,advect_flag)
+
+Base.length(config::VortexConfig) = config.Nv
+statelength(config::VortexConfig) = 3*length(config)
 
 
 "A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).

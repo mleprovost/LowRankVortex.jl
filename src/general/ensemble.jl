@@ -60,17 +60,17 @@ for op in (:*, :\)
   end
 end
 
-mean(X::EnsembleMatrix) = _ensemble_mean(X.X)
-std(X::EnsembleMatrix) = _ensemble_std(X.X)
-cov(X::EnsembleMatrix) = _ensemble_cov(X.X)
-cov(X::EnsembleMatrix{Nx,Ne},Y::EnsembleMatrix{Ny,Ne}) where {Nx,Ny,Ne} = _ensemble_cov(X.X,Y.X)
-ensemble_perturb(X::EnsembleMatrix{Nx}) where {Nx} = BasicEnsembleMatrix(_ensemble_perturb(X.X))
+mean(X::EnsembleMatrix) = _ensemble_mean(X.X,X.burnin)
+std(X::EnsembleMatrix) = _ensemble_std(X.X,X.burnin)
+cov(X::EnsembleMatrix) = _ensemble_cov(X.X,X.burnin)
+cov(X::EnsembleMatrix{Nx,Ne},Y::EnsembleMatrix{Ny,Ne}) where {Nx,Ny,Ne} = _ensemble_cov(X.X,Y.X,max(X.burnin,Y.burnin))
+ensemble_perturb(X::EnsembleMatrix{Nx}) where {Nx} = BasicEnsembleMatrix(_ensemble_perturb(X.X,X.burnin),burnin=X.burnin)
 
-_ensemble_mean(X::AbstractMatrix) = vec(mean(X,dims=2))
-_ensemble_perturb(X::AbstractMatrix) = X .- _ensemble_mean(X)
-_ensemble_std(X::AbstractMatrix) = vec(std(X,dims=2))
-_ensemble_cov(X::AbstractMatrix) = cov(X,dims=2,corrected=true)
-_ensemble_cov(X::AbstractMatrix,Y::AbstractMatrix) = cov(X,Y,dims=2,corrected=true)
+_ensemble_mean(X::AbstractMatrix,burnin) = vec(mean(X[:,burnin:end],dims=2))
+_ensemble_perturb(X::AbstractMatrix,burnin) = X .- _ensemble_mean(X,burnin)
+_ensemble_std(X::AbstractMatrix,burnin) = vec(std(X[burnin:end],dims=2))
+_ensemble_cov(X::AbstractMatrix,burnin) = cov(X[:,burnin:end],dims=2,corrected=true)
+_ensemble_cov(X::AbstractMatrix,Y::AbstractMatrix,burnin) = cov(X[:,burnin:end],Y[:,burnin:end],dims=2,corrected=true)
 
 """
     whiten(X::BasicEnsembleMatrix,Σx)
@@ -148,6 +148,9 @@ end
 
 Base.vcat(Y::BasicEnsembleMatrix{Ny,Ne},X::BasicEnsembleMatrix{Nx,Ne}) where {Ny,Nx,Ne} =
     YXEnsembleMatrix(Y.X,X.X)
+
+Base.hcat(X::BasicEnsembleMatrix{Nx}...) where {Nx} =
+    BasicEnsembleMatrix(hcat(map(x -> x.X,X)...);burnin=max(map(x -> x.burnin,X)...))
 
 
 # BROADCASTING STUFF
