@@ -75,8 +75,11 @@ end
 end
 
 @testset "Randomizer routines" begin
-    zv = LowRankVortex.random_points_unit_circle(1000,1.05,1.4);
-    @test isapprox(median(abs.(zv)),1.05,atol=5e-3)
+    rmin, rmax = 1.05, 1.4
+    zv = LowRankVortex.random_points_unit_circle(1000,(rmin,rmax),(0,2π));
+    rmedian = 1.0 + sqrt((rmin-1)*(rmax-1))
+
+    @test isapprox(median(abs.(zv)),rmedian,atol=5e-3)
     @test minimum(abs.(zv)) > 1
     @test maximum(abs.(zv)) < 1.5
 
@@ -112,7 +115,7 @@ end
 
   config_data = VortexConfig(Nv, δ,body=b)
 
-  zv = LowRankVortex.random_points_unit_circle(Nv,1.05,1.4)
+  zv = LowRankVortex.random_points_unit_circle(Nv,(1.05,1.4),(0,2π))
   vort = Vortex.Blob.(zv,Γv,δ)
 
   x = lagrange_to_state_reordered(vort,config_data)
