@@ -177,7 +177,7 @@ end
 
   config_data = VortexConfig(Nv, δ,body=b)
 
-	zv = LowRankVortex.random_points_unit_circle(Nv,1.05,1.4)
+	zv = LowRankVortex.random_points_unit_circle(Nv,(1.05,1.4),(0,2π))
   vort = Vortex.Blob.(zv,Γv,δ)
 
 	p = analytical_pressure(sens,vort,config_data)
