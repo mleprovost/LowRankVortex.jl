@@ -18,6 +18,7 @@ given observations `ystar`, noise covariance `Σϵ`, and observation structure `
 """
 function loglikelihood(x,ystar,Σϵ,obs::AbstractObservationOperator)
     y = observations(x,obs)
+    #loss = norm(ystar-y .- mean(ystar-y),Σϵ)
     loss = norm(ystar-y,Σϵ)
     return -loss^2/2
 end

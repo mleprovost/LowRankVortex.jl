@@ -1,6 +1,6 @@
 export lagrange_to_state_reordered, state_to_lagrange_reordered, state_to_positions_and_strengths,
         state_to_vortex_states, states_to_vortex_states, collect_estimated_states,
-        generate_random_state
+        generate_random_state,generate_random_states, positions_and_strengths_to_state
 
 """
     collect_estimated_states(collection::Vector{Vector{AbstractENKFSolution}},config::VortexConfig) -> Array
@@ -82,6 +82,10 @@ function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConf
     vort_prior = Vortex.Blob.(zv_prior,Γv_prior,config.δ)
     return lagrange_to_state_reordered(vort_prior,config)
 end
+
+generate_random_states(nstates,xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig) =
+    [generate_random_state(xr,yr,Γr,config) for i in 1:nstates]
+
 
 """
     lagrange_to_state_reordered(source::Vector{Element},config::VortexConfig) -> Vector{Float64}
@@ -173,4 +177,28 @@ function state_to_positions_and_strengths(state::AbstractVector{Float64}, config
   Γv = [state[2Nv+i] for i in 1:Nv]
 
   return zv, Γv
+end
+
+function positions_and_strengths_to_state(zv::AbstractVector{ComplexF64},Γv::AbstractVector{Float64},config::VortexConfig)
+  Nv = length(zv)
+  state = zeros(3Nv)
+  for i = 1:Nv
+    state[2i-1] = real(zv[i])
+    state[2i] = imag(zv[i])
+    state[2Nv+i] = Γv[i]
+  end
+  return state
+end
+
+function positions_and_strengths_to_state(ζv::AbstractVector{ComplexF64},Γv::AbstractVector{Float64},config::VortexConfig{Bodies.ConformalBody})
+  Nv = length(ζv)
+  state = zeros(3Nv)
+  for i = 1:Nv
+    ri = abs(ζv[i])
+    Θi = angle(ζv[i])
+    state[i] = log(ri-1.0)
+    state[Nv+i] = ri*Θi
+    state[2*Nv+i] =  Γv[i]
+  end
+  return state
 end
