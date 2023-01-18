@@ -32,9 +32,9 @@
 
     ### Error results for dpdz from analytical, AD and FD differentiation for point vortices
 
-    dpdz_AD, dpdzstar_AD = PotentialFlow.Elements.jacobian_position(x -> pressure(zcircle, x; ϵ = 0.0, walltype=LowRankVortex.Cylinder), points)
+    dpdz_AD, dpdzstar_AD = PotentialFlow.Elements.jacobian_position(x -> analytical_pressure(zcircle, x; ϵ = 0.0, walltype=LowRankVortex.Cylinder), points)
 
-    dpdz_analytical = dpdzv(zcircle,1,points; ϵ = 0.0, walltype=LowRankVortex.Cylinder)
+    dpdz_analytical = analytical_dpdzv(zcircle,1,points; ϵ = 0.0, walltype=LowRankVortex.Cylinder)
 
 
     # Comparison analytical vs AD
@@ -42,10 +42,10 @@
 
 
     # Comparison FD vs AD
-    pc = pressure(zcircle, points; ϵ = 0.0, walltype=LowRankVortex.Cylinder);
+    pc = analytical_pressure(zcircle, points; ϵ = 0.0, walltype=LowRankVortex.Cylinder);
 
-    pc_x1 = pressure(zcircle, points_x1; ϵ = 0.0, walltype=LowRankVortex.Cylinder)
-    pc_y1 = pressure(zcircle, points_y1; ϵ = 0.0, walltype=LowRankVortex.Cylinder)
+    pc_x1 = analytical_pressure(zcircle, points_x1; ϵ = 0.0, walltype=LowRankVortex.Cylinder)
+    pc_y1 = analytical_pressure(zcircle, points_y1; ϵ = 0.0, walltype=LowRankVortex.Cylinder)
 
     dpdx1_FD = (1 / dx) * (pc_x1 - pc)
     dpdy1_FD = (1 / dx) * (pc_y1 - pc)
@@ -56,9 +56,9 @@
 
     ### Error results for dpdΓ from analytical, AD and FD differentiation for point vortices
 
-    dpdΓ_AD = PotentialFlow.Elements.jacobian_strength(x -> pressure(zcircle, x; ϵ = 0.0, walltype=LowRankVortex.Cylinder), points)
+    dpdΓ_AD = PotentialFlow.Elements.jacobian_strength(x -> analytical_pressure(zcircle, x; ϵ = 0.0, walltype=LowRankVortex.Cylinder), points)
 
-    dpdΓ_analytical = dpdΓv(zcircle,1,points; ϵ = 0.0, walltype=LowRankVortex.Cylinder)
+    dpdΓ_analytical = analytical_dpdΓv(zcircle,1,points; ϵ = 0.0, walltype=LowRankVortex.Cylinder)
 
 
     # Comparison analytical vs AD
@@ -66,8 +66,8 @@
 
 
     # Comparison FD vs AD
-    pc = pressure(zcircle, points; ϵ = 0.0, walltype=LowRankVortex.Cylinder);
-    pc_Γ1 = pressure(zcircle, points_Γ1; ϵ = 0.0, walltype=LowRankVortex.Cylinder);
+    pc = analytical_pressure(zcircle, points; ϵ = 0.0, walltype=LowRankVortex.Cylinder);
+    pc_Γ1 = analytical_pressure(zcircle, points_Γ1; ϵ = 0.0, walltype=LowRankVortex.Cylinder);
 
 
     dpdΓ1_FD = (1 / dx) * (pc_Γ1 - pc)
@@ -76,18 +76,18 @@
 
     ### Error results for dpdz from analytical, AD and FD differentiation for blobs
 
-    dpdz_AD, dpdzstar_AD = PotentialFlow.Elements.jacobian_position(x -> pressure(zcircle, x; ϵ = δ, walltype=LowRankVortex.Cylinder), blobs)
+    dpdz_AD, dpdzstar_AD = PotentialFlow.Elements.jacobian_position(x -> analytical_pressure(zcircle, x; ϵ = δ, walltype=LowRankVortex.Cylinder), blobs)
 
-    dpdz_analytical = dpdzv(zcircle,1,blobs; ϵ = δ, walltype=LowRankVortex.Cylinder)
+    dpdz_analytical = analytical_dpdzv(zcircle,1,blobs; ϵ = δ, walltype=LowRankVortex.Cylinder)
 
     # Comparison analytical vs AD
     @test isapprox(dpdz_AD[:,1], dpdz_analytical; atol = atolAD)
 
     # Comparison FD vs AD
-    pc = pressure(zcircle, blobs; ϵ = δ, walltype=LowRankVortex.Cylinder);
+    pc = analytical_pressure(zcircle, blobs; ϵ = δ, walltype=LowRankVortex.Cylinder);
 
-    pc_x1 = pressure(zcircle, blobs_x1; ϵ = δ, walltype=LowRankVortex.Cylinder)
-    pc_y1 = pressure(zcircle, blobs_y1; ϵ = δ, walltype=LowRankVortex.Cylinder)
+    pc_x1 = analytical_pressure(zcircle, blobs_x1; ϵ = δ, walltype=LowRankVortex.Cylinder)
+    pc_y1 = analytical_pressure(zcircle, blobs_y1; ϵ = δ, walltype=LowRankVortex.Cylinder)
 
     dpdx1_FD = (1 / dx) * (pc_x1 - pc)
     dpdy1_FD = (1 / dx) * (pc_y1 - pc)
@@ -97,16 +97,16 @@
 
     ### Error results for dpdΓ from analytical, AD and FD differentiation for blobs
 
-    dpdΓ_AD = PotentialFlow.Elements.jacobian_strength(x -> pressure(zcircle, x; ϵ = δ, walltype=LowRankVortex.Cylinder), blobs)
+    dpdΓ_AD = PotentialFlow.Elements.jacobian_strength(x -> analytical_pressure(zcircle, x; ϵ = δ, walltype=LowRankVortex.Cylinder), blobs)
 
-    dpdΓ_analytical = dpdΓv(zcircle,1,blobs; ϵ = δ, walltype=LowRankVortex.Cylinder)
+    dpdΓ_analytical = analytical_dpdΓv(zcircle,1,blobs; ϵ = δ, walltype=LowRankVortex.Cylinder)
 
     # Comparison analytical vs AD
     @test isapprox(dpdΓ_AD[:,1], dpdΓ_analytical; atol = atolAD)
 
     # Comparison FD vs AD
-    pc = pressure(zcircle, blobs; ϵ = δ, walltype=LowRankVortex.Cylinder);
-    pc_Γ1 = pressure(zcircle, blobs_Γ1; ϵ = δ, walltype=LowRankVortex.Cylinder);
+    pc = analytical_pressure(zcircle, blobs; ϵ = δ, walltype=LowRankVortex.Cylinder);
+    pc_Γ1 = analytical_pressure(zcircle, blobs_Γ1; ϵ = δ, walltype=LowRankVortex.Cylinder);
 
     dpdΓ1_FD = (1 / dx) * (pc_Γ1 - pc)
 

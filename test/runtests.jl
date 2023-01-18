@@ -14,6 +14,7 @@ import PotentialFlow.Elements: jacobian_position, jacobian_strength, jacobian_pa
 
 const GROUP = get(ENV, "GROUP", "All")
 
+
 if GROUP == "All" || GROUP == "Vortex"
   include("vortex.jl")
 end
