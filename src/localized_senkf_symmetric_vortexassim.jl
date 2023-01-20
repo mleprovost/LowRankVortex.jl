@@ -45,8 +45,10 @@ function localized_senkf_symmetric_vortexassim(algo::StochEnKF, Lxy, Lyy, X, tsp
     Xa = Array{Float64,2}[]
     push!(Xa, copy(state(X, Ny, Nx)))
 
+    ### specific to localization ###
     dyy = dobsobs(config)
     Gyy = gaspari.(dyy./Lyy)
+    #######
 
     # Run the ensemble filter
     for i=1:length(Acycle)

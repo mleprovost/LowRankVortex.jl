@@ -64,7 +64,18 @@ function adaptive_lowrankenkf_symmetric_vortexassim(algo::LREnKF, X, tspan::Tupl
 	press_itp = CubicSplineInterpolation((LinRange(real(config.ss[1]), real(config.ss[end]), length(config.ss)),
 	                                   t0:data.Δt:tf), data.yt, extrapolation_bc =  Line())
 
-	# Pre allocate arrays for the sensitivity analysis
+	
+	yt(t) = press_itp(real.(config.ss), t)
+
+
+	Xf = Array{Float64,2}[]
+	push!(Xf, copy(state(X, Ny, Nx)))
+
+	Xa = Array{Float64,2}[]
+	push!(Xa, copy(state(X, Ny, Nx)))
+
+  #### specific to this version ####
+  # Pre allocate arrays for the sensitivity analysis
 	Jac = zeros(Ny, 6*Nv)
 	wtarget = zeros(ComplexF64, Ny)
 
@@ -78,20 +89,11 @@ function adaptive_lowrankenkf_symmetric_vortexassim(algo::LREnKF, X, tspan::Tupl
 	Ctsblob = zeros(ComplexF64, Ny, 2*Nv)
 	∂Ctsblob = zeros(Ny, 2*Nv)
 
-	yt(t) = press_itp(real.(config.ss), t)
-	rxhist = Int64[]
+  rxhist = Int64[]
 	ryhist = Int64[]
-
-
-	Xf = Array{Float64,2}[]
-	push!(Xf, copy(state(X, Ny, Nx)))
-
-	Xa = Array{Float64,2}[]
-	push!(Xa, copy(state(X, Ny, Nx)))
-
   Cx_history = Array{Float64,2}[]
   Cy_history = Array{Float64,2}[]
-
+  ######
 
 	# Run the ensemble filter
 	for i=1:length(Acycle)
