@@ -4,6 +4,12 @@ const RXDEFAULT = 100
 const RYDEFAULT = 100
 const DEFAULT_ADAPTIVE_RATIO = 0.95
 
+default_state_filter!(x, config) = x
+
+
+const DEFAULT_STATE_FILTER = default_state_filter!
+
+#### OLD ####
 
 """
 A structure for the low-rank ensemble Kalman filter (LREnKF)
@@ -53,6 +59,9 @@ function Base.show(io::IO, lrenkf::LREnKF)
 	println(io,"LREnKF  with filtered = $(lrenkf.isfiltered)")
 end
 
+
+#### NEW ####
+
 abstract type AbstractSeqFilter end
 
 """
@@ -62,7 +71,7 @@ References:
 Le Provost, Baptista, Marzouk, and Eldredge, "A low-rank ensemble Kalman filter for elliptic observations", arXiv preprint, 2203.05120, 2022.
 
 ## Fields
-- `G::Function`: "Filter function"
+- `state_filter!::Function`: "Filter function"
 - `ϵy::AdditiveInflation`: "Standard deviations of the measurement noise distribution"
 - `Δtdyn::Float64`: "Time step dynamic"
 - `Δtobs::Float64`: "Time step observation"
@@ -73,7 +82,7 @@ Optional arguments:
 """
 struct StochEnKFParameters{islocal}<:AbstractSeqFilter
     "Filter function"
-    G::Function
+    state_filter!::Function
 
     "Standard deviations of the measurement noise distribution"
     ϵy::AdditiveInflation
@@ -91,15 +100,15 @@ struct StochEnKFParameters{islocal}<:AbstractSeqFilter
     Lxy::Float64
 end
 
-function StochEnKFParameters(G::Function, ϵy::AdditiveInflation,
+function StochEnKFParameters(state_filter!::Function, ϵy::AdditiveInflation,
     Δtdyn, Δtobs; islocal = false, Lyy = 1.0e10, Lxy = 1.0e10)
     @assert norm(mod(Δtobs, Δtdyn))<1e-12 "Δtobs should be an integer multiple of Δtdyn"
 
-    return StochEnKFParameters{islocal}(G, ϵy, Δtdyn, Δtobs, Lyy, Lxy)
+    return StochEnKFParameters{islocal}(state_filter!, ϵy, Δtdyn, Δtobs, Lyy, Lxy)
 end
 
 # If no filtering function is provided, use the identity in the constructor.
-StochEnKFParameters(ϵy::AdditiveInflation, Δtdyn, Δtobs; kwargs...) = StochEnKFParameters(x -> x, ϵy, Δtdyn, Δtobs; kwargs...)
+StochEnKFParameters(ϵy::AdditiveInflation, Δtdyn, Δtobs; kwargs...) = StochEnKFParameters(DEFAULT_STATE_FILTER, ϵy, Δtdyn, Δtobs; kwargs...)
 
 
 function Base.show(io::IO, ::StochEnKFParameters{islocal}) where {islocal}
@@ -113,7 +122,7 @@ References:
 Le Provost, Baptista, Marzouk, and Eldredge, "A low-rank ensemble Kalman filter for elliptic observations", arXiv preprint, 2203.05120, 2022.
 
 ## Fields
-- `G::Function`: "Filter function"
+- `state_filter!::Function`: "Filter function"
 - `ϵy::AdditiveInflation`: "Standard deviations of the measurement noise distribution"
 - `Δtdyn::Float64`: "Time step dynamic"
 - `Δtobs::Float64`: "Time step observation"
@@ -127,7 +136,7 @@ Optional arguments:
 """
 struct LREnKFParameters{isadaptive}<:AbstractSeqFilter
     "Filter function"
-    G::Function
+    state_filter!::Function
 
     "Standard deviations of the measurement noise distribution"
     ϵy::AdditiveInflation
@@ -149,19 +158,20 @@ struct LREnKFParameters{isadaptive}<:AbstractSeqFilter
 end
 
 
-function LREnKFParameters(G::Function, ϵy::AdditiveInflation,
+function LREnKFParameters(state_filter!::Function, ϵy::AdditiveInflation,
     Δtdyn, Δtobs; isadaptive = true, rxdefault::Int = RXDEFAULT, rydefault::Int = RYDEFAULT, ratio::Float64 = DEFAULT_ADAPTIVE_RATIO)
     @assert norm(mod(Δtobs, Δtdyn))<1e-12 "Δtobs should be an integer multiple of Δtdyn"
-    return LREnKFParameters{isadaptive}(G, ϵy, Δtdyn, Δtobs, rxdefault, rydefault, ratio)
+    return LREnKFParameters{isadaptive}(state_filter!, ϵy, Δtdyn, Δtobs, rxdefault, rydefault, ratio)
 end
 
 # If no filtering function is provided, use the identity in the constructor.
-LREnKFParameters(ϵy::AdditiveInflation,Δtdyn, Δtobs; kwargs...) = LREnKFParameters(x-> x, ϵy, Δtdyn, Δtobs, false; kwargs...)
+LREnKFParameters(ϵy::AdditiveInflation,Δtdyn, Δtobs; kwargs...) = LREnKFParameters(DEFAULT_STATE_FILTER, ϵy, Δtdyn, Δtobs; kwargs...)
 
 
 function Base.show(io::IO, ::LREnKFParameters{isadaptive}) where isadaptive
 	println(io,"LREnKF with adaptive = $(isadaptive)")
 end
+
 
 
 
@@ -174,7 +184,7 @@ end
 A filter function to ensure that the point vortices stay above the x-axis, and retain a positive circulation.
 This function would typically be used before and after the analysis step to enforce those constraints.
 """
-function filter_state!(x, config::VortexConfig)
+function symmetry_state_filter!(x, config::VortexConfig)
 	@inbounds for j=1:config.Nv
 		# Ensure that vortices stay above the x axis
 		x[3*j-1] = clamp(x[3*j-1], 1e-2, Inf)
@@ -183,6 +193,10 @@ function filter_state!(x, config::VortexConfig)
 	end
     return x
 end
+
+# Legacy purposes
+filter_state!(a...) = symmetry_state_filter!(a...)
+
 
 # This function apply additive inflation to the state components only,
 # not the measurements, X is an Array{Float64,2} or a view of it
@@ -303,7 +317,6 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
   Nv = config.Nv
 	ystar = zeros(Ny)
 
-
   allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
 	# Define the observation operator
@@ -356,12 +369,7 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
 	   ϵx(X, Ny, Nx, config)
 
 	   # Filter state
-	   #if algo.isfiltered == true
-		   @inbounds for i=1:Ne
-			   x = view(X, Ny+1:Ny+Nx, i)
-			   x .= filter_state!(x, config)
-		   end
-	   #end
+     apply_filter!(X,Ne,Nx,Ny,config,algo)
 
      tnext = t0+i*Δtobs
 
@@ -374,12 +382,7 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
      enkf_analysis_step!(X,Cx_history,Cy_history,rxhist,ryhist,tnext,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream,algo)
 
 	   # Filter state
-	   #if algo.isfiltered == true
-		   @inbounds for i=1:Ne
-			   x = view(X, Ny+1:Ny+Nx, i)
-			   x .= filter_state!(x, config)
-		   end
-	   #end
+     apply_filter!(X,Ne,Nx,Ny,config,algo)
 
 	   push!(Xa, deepcopy(state(X, Ny, Nx)))
 	end
@@ -387,32 +390,8 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
 	return Xf, Xa, rxhist, ryhist, Cx_history, Cy_history
 end
 
-allocate_forecast_cache(X,Nx,Ny,config,::AbstractSeqFilter) = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
 
-allocate_jacobian_cache(Nv,Ny,::StochEnKFParameters) = nothing
-
-function allocate_jacobian_cache(Nv,Ny,::LREnKFParameters)
-  Jac = zeros(Ny, 6*Nv)
-	wtarget = zeros(ComplexF64, Ny)
-
-	dpd = zeros(ComplexF64, Ny, 2*Nv)
-	dpdstar = zeros(ComplexF64, Ny, 2*Nv)
-
-	Css = zeros(ComplexF64, 2*Nv, 2*Nv)
-	Cts = zeros(ComplexF64, Ny, 2*Nv)
-
-	∂Css = zeros(2*Nv, 2*Nv)
-	Ctsblob = zeros(ComplexF64, Ny, 2*Nv)
-	∂Ctsblob = zeros(Ny, 2*Nv)
-
-  return Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob
-end
-
-allocate_state_gramian(Nx,::StochEnKFParameters) = nothing
-allocate_observation_gramian(Ny,::StochEnKFParameters) = nothing
-
-allocate_state_gramian(Nx,::LREnKFParameters) = zeros(Nx,Nx)
-allocate_observation_gramian(Ny,::LREnKFParameters) = zeros(Ny,Ny)
+##### ANALYSIS STEPS VIA DIFFERENT FLAVORS OF ENKF #####
 
 ### Stochastic ENKF ####
 
@@ -430,16 +409,18 @@ function enkf_analysis_step!(X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Ne
   # Apply the Kalman gain based on the representers
   # Burgers G, Jan van Leeuwen P, Evensen G. 1998 Analysis scheme in the ensemble Kalman
   # filter. Monthly weather review 126, 1719–1724. Solve the linear system for b ∈ R^{Ny × Ne}:
-  Σy = (HXpert*HXpert' + ϵpert*ϵpert')
-  localizedΣy =  Gyy .* Σy
-  b = localizedΣy\(ystar .- (X[1:Ny,:] + ϵ))
 
   # Update the ensemble members according to:
   # x^{a,i} = x^i - Σ_{X,Y}b^i, with b^i =  Σ_Y^{-1}(h(x^i) + ϵ^i - ystar)
-  localizedΣxy = Xpert*HXpert'
-  apply_state_localization!(localizedΣxy,X,Nx,Ny,config,algo)
 
-  view(X,Ny+1:Ny+Nx,:) .+= localizedΣxy*b
+  Σy = HXpert*HXpert' + ϵpert*ϵpert'
+  apply_sensor_localization!(Σy,Gyy,algo)
+  b = Σy\(ystar .- (X[1:Ny,:] + ϵ))
+
+  Σxy = Xpert*HXpert'
+  apply_state_localization!(Σxy,X,Nx,Ny,config,algo)
+
+  view(X,Ny+1:Ny+Nx,:) .+= Σxy*b
 
   return X
 end
@@ -551,12 +532,54 @@ function enkf_analysis_step!(X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Ne
 
 end
 
-function sensor_localization_operator(config,algo::StochEnKFParameters{true})
-  dyy = dobsobs(config)
-  Gyy = gaspari.(dyy./algo.Lyy)
+### Utilities ####
+
+function apply_filter!(X,Ne,Nx,Ny,config,algo)
+  @inbounds for i=1:Ne
+    x = view(X, Ny+1:Ny+Nx, i)
+    x .= algo.state_filter!(x, config)
+  end
+  return X
 end
 
-sensor_localization_operator(config,::AbstractSeqFilter) = I
+allocate_forecast_cache(X,Nx,Ny,config,::AbstractSeqFilter) = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
+
+allocate_jacobian_cache(Nv,Ny,::StochEnKFParameters) = nothing
+
+function allocate_jacobian_cache(Nv,Ny,::LREnKFParameters)
+  Jac = zeros(Ny, 6*Nv)
+	wtarget = zeros(ComplexF64, Ny)
+
+	dpd = zeros(ComplexF64, Ny, 2*Nv)
+	dpdstar = zeros(ComplexF64, Ny, 2*Nv)
+
+	Css = zeros(ComplexF64, 2*Nv, 2*Nv)
+	Cts = zeros(ComplexF64, Ny, 2*Nv)
+
+	∂Css = zeros(2*Nv, 2*Nv)
+	Ctsblob = zeros(ComplexF64, Ny, 2*Nv)
+	∂Ctsblob = zeros(Ny, 2*Nv)
+
+  return Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob
+end
+
+allocate_state_gramian(Nx,::StochEnKFParameters) = nothing
+allocate_observation_gramian(Ny,::StochEnKFParameters) = nothing
+
+allocate_state_gramian(Nx,::LREnKFParameters) = zeros(Nx,Nx)
+allocate_observation_gramian(Ny,::LREnKFParameters) = zeros(Ny,Ny)
+
+function sensor_localization_operator(config,algo::StochEnKFParameters{true})
+  dyy = dobsobs(config)
+  return gaspari.(dyy./algo.Lyy)
+end
+
+sensor_localization_operator(config,::AbstractSeqFilter) = nothing
+
+function apply_sensor_localization!(Σy,Gyy,algo::StochEnKFParameters{true})
+end
+
+apply_sensor_localization!(Σy,Gyy,::AbstractSeqFilter) = nothing
 
 function apply_state_localization!(Σxy,X,Nx,Ny,config,algo::StochEnKFParameters{true})
   dxy = dstateobs(X, Ny, Nx, config)
