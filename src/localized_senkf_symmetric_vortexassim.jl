@@ -1,38 +1,5 @@
-export dstateobs, dobsobs, localized_senkf_symmetric_vortexassim
+export localized_senkf_symmetric_vortexassim
 
-function dstateobs(X, Ny, Nx, config::VortexConfig)
-    Nypx, Ne = size(X)
-    @assert Nypx == Ny + Nx
-    @assert Ny == length(config.ss)
-    Nv = config.Nv
-    dXY = zeros(Nv, Ny, Ne)
-
-    for i=1:Ne
-        xi = X[Ny+1:Ny+Nx, i]
-        zi = map(l->xi[3*l-2] + im*xi[3*l-1], 1:Nv)
-
-        for J=1:Nv
-            for k=1:Ny
-                dXY[J,k,i] = abs(zi[J] - config.ss[k])
-            end
-        end
-    end
-    return mean(dXY, dims = 3)[:,:,1]
-end
-
-function dobsobs(config::VortexConfig)
-    Ny = length(config.ss)
-    dYY = zeros(Ny, Ny)
-    # Exploit symmetry of the distance matrix dYY
-    for i=1:Ny
-        for j=1:i-1
-            dij = abs(config.ss[i] - config.ss[j])
-            dYY[i,j] = dij
-            dYY[j,i] = dij
-        end
-    end
-    return dYY
-end
 
 function localized_senkf_symmetric_vortexassim(algo::StochEnKF, Lxy, Lyy, X, tspan::Tuple{S,S}, config::VortexConfig, data::SyntheticData; withfreestream::Bool = false, P::Parallel = serial) where {S<:Real}
 
