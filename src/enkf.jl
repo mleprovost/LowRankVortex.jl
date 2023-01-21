@@ -361,6 +361,7 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
 
 	   push!(Xf, deepcopy(state(X, Ny, Nx)))
 
+     ## These steps belong as a general analysis step ##
 	   # Get the true observation ystar
 	   ystar .= yt(t0+i*Δtobs)
 
@@ -379,10 +380,12 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
 	   # Generate samples from the observation noise
 	   ϵ = algo.ϵy.σ*randn(Ny, Ne) .+ algo.ϵy.m
 
-     enkf_analysis_step!(X,Cx_history,Cy_history,rxhist,ryhist,tnext,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream,algo)
+     enkf_kalman_update!(algo,X,Cx_history,Cy_history,rxhist,ryhist,tnext,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream)
 
 	   # Filter state
      apply_filter!(X,Ne,Nx,Ny,config,algo)
+
+     ######
 
 	   push!(Xa, deepcopy(state(X, Ny, Nx)))
 	end
@@ -395,7 +398,11 @@ end
 
 ### Stochastic ENKF ####
 
-function enkf_analysis_step!(X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream,algo::StochEnKFParameters)
+enkf_kalman_update!(algo::StochEnKFParameters,args...) = _senkf_kalman_update!(algo,args...)
+enkf_kalman_update!(algo::LREnKFParameters,args...) = _lrenkf_kalman_update!(algo,args...)
+
+
+function _senkf_kalman_update!(algo,X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream)
 
   # The implementation of the stochastic EnKF follows
   # Form the perturbation matrix for the state
@@ -427,7 +434,7 @@ end
 
 ### Low-rank ENKF ####
 
-function enkf_analysis_step!(X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream,algo::LREnKFParameters{isadaptive}) where isadaptive
+function _lrenkf_kalman_update!(algo::LREnKFParameters{isadaptive},X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream) where isadaptive
 
   Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob = Jac_data
 
@@ -594,3 +601,6 @@ function apply_state_localization!(Σxy,X,Nx,Ny,config,algo::StochEnKFParameters
 end
 
 apply_state_localization!(Σxy,X,Nx,Ny,config,::AbstractSeqFilter) = nothing
+
+
+###### THINGS THAT ARE SPECIFIC TO VORTEX PROBLEM #######
