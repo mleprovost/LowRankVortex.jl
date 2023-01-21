@@ -38,7 +38,7 @@ include("general/vortex.jl")
 include("general/api.jl")
 include("general/classification.jl")
 
-include("forecast.jl")
+include("vortex_forecast.jl")
 include("generate_twin_experiment.jl")
 include("enkf.jl")
 include("senkf_vortexassim.jl")

@@ -1,13 +1,63 @@
-export SymmetricVortexForecastOperator, vortex, symmetric_vortex
+### Forecasting operators for vortex problems ####
 
-import TransportBasedInference: Parallel, Serial, Thread
+export VortexForecastOperator, SymmetricVortexForecastOperator
+
+export vortex, symmetric_vortex # These should be removed
+
+import TransportBasedInference: Parallel, Serial, Thread # These should not be necessary
+
+
+struct VortexForecastOperator{Nx,withfreestream,CVT} <: AbstractForecastOperator{Nx}
+		config :: VortexConfig
+		cachevels :: CVT
+end
+
+"""
+		VortexForecastOperator(config::VortexConfig)
+
+Allocate the structure for forecasting of vortex dynamics
+"""
+function VortexForecastOperator(config::VortexConfig)
+	withfreestream = config.U == 0.0 ? false : true
+	Nx = 3*config.Nv
+	cachevels = allocate_velocity(state_to_lagrange(zeros(Nx), config))
+	SymmetricVortexForecastOperator{Nx,withfreestream,typeof(cachevels)}(config,cachevels)
+end
+
+
+function forecast(x::AbstractVector,t,Δt,fdata::VortexForecastOperator{Nx,withfreestream}) where {Nx,withfreestream}
+	@unpack config, cachevels = fdata
+	@unpack U, advect_flag = config
+
+	freestream = Freestream(U)
+	source = state_to_lagrange(col, config)
+
+	# Compute the induced velocity (by exploiting the symmetry of the problem)
+	reset_velocity!(cachevels, source)
+	self_induce_velocity!(cachevels, source, t)
+
+	if withfreestream
+		induce_velocity!(cachevels, source, freestream, t)
+	end
+
+	# Advect the system
+	if advect_flag
+		advect!(source, source, cachevels, Δt)
+	end
+
+	return lagrange_to_state(source, config)
+
+end
 
 struct SymmetricVortexForecastOperator{Nx,withfreestream,CVT} <: AbstractForecastOperator{Nx}
 		config :: VortexConfig
 		cachevels :: CVT
 end
 
+
 """
+		SymmetricVortexForecastOperator(config::VortexConfig)
+
 Allocate the structure for forecasting of vortex dynamics with symmetry
 about the x axis.
 """
@@ -18,7 +68,29 @@ function SymmetricVortexForecastOperator(config::VortexConfig)
 	SymmetricVortexForecastOperator{Nx,withfreestream,typeof(cachevels)}(config,cachevels)
 end
 
-function forecast(x,t,Δt,fdata::SymmetricVortexForecastOperator{Nx,withfreestream}) where {Nx,withfreestream}
+function forecast(x::AbstractVector,t,Δt,fdata::SymmetricVortexForecastOperator{Nx,withfreestream}) where {Nx,withfreestream}
+	@unpack config, cachevels = fdata
+	@unpack U, advect_flag = config
+
+	freestream = Freestream(U)
+	source = state_to_lagrange(x, config)
+
+	reset_velocity!(cachevels, source)
+	self_induce_velocity!(cachevels[1], source[1], t)
+	induce_velocity!(cachevels[1], source[1], source[2], t)
+
+	if withfreestream
+		induce_velocity!(cachevels[1], source[1], freestream, t)
+	end
+	# @. cachevels[2] = conj(cachevels[1])
+
+	# We only care about the transport of the top vortices
+	# Advect the system
+	if advect_flag
+		advect!(source[1:1], source[1:1], cachevels[1:1], Δt)
+	end
+
+	return lagrange_to_state(source, config)
 
 end
 
