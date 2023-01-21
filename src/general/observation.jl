@@ -1,5 +1,5 @@
 # subtypes of AbstractObservationOperator should provide
-#  - an extension of the observation and observation! operators
+#  - an extension of the observation operator
 #  - an extension of the jacob! operator
 # They should keep sensor locations and vortex configuration internal
 # Nx is number of states, Ny is number of observations

@@ -1,6 +1,26 @@
-export vortex, symmetric_vortex
+export SymmetricVortexForecastOperator, vortex, symmetric_vortex
 
 import TransportBasedInference: Parallel, Serial, Thread
+
+struct SymmetricVortexForecastOperator{Nx,withfreestream,CVT} <: AbstractForecastOperator{Nx}
+		config :: VortexConfig
+		cachevels :: CVT
+end
+
+"""
+Allocate the structure for forecasting of vortex dynamics with symmetry
+about the x axis.
+"""
+function SymmetricVortexForecastOperator(config::VortexConfig)
+	withfreestream = config.U == 0.0 ? false : true
+	Nx = 3*config.Nv
+	cachevels = allocate_velocity(state_to_lagrange(zeros(Nx), config))
+	SymmetricVortexForecastOperator{Nx,withfreestream,typeof(cachevels)}(config,cachevels)
+end
+
+function forecast(x,t,Δt,fdata::SymmetricVortexForecastOperator{Nx,withfreestream}) where {Nx,withfreestream}
+
+end
 
 
 vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool = false) = vortex(X, t, Ny, Nx, cachevels, config, serial, withfreestream = withfreestream)

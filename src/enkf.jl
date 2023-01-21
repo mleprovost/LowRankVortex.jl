@@ -361,9 +361,12 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
 
 	   push!(Xf, deepcopy(state(X, Ny, Nx)))
 
-     ## These steps belong as a general analysis step ##
+     tnext = t0+i*Δtobs
+
 	   # Get the true observation ystar
-	   ystar .= yt(t0+i*Δtobs)
+	   ystar .= yt(tnext)
+
+     ## These steps belong as a general analysis step ##
 
 	   # Perform state inflation
 	   ϵmul(X, Ny+1, Ny+Nx)
@@ -372,7 +375,6 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
 	   # Filter state
      apply_filter!(X,Ne,Nx,Ny,config,algo)
 
-     tnext = t0+i*Δtobs
 
 	   # Evaluate the observation operator for the different ensemble members
 	   observe(h, X, tnext, Ny, Nx; P = P)
@@ -393,6 +395,23 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
 	return Xf, Xa, rxhist, ryhist, Cx_history, Cy_history
 end
 
+#=
+Generically, the user should supply
+- An overloaded version of forecast! function for specific AbstractForecastOperator type (with internal cache)
+- An overloaded version of observations! function for specific AbstractObservationOperator type (with internal cache)
+- An overloaded version of jacob! function for specific AbstractObservationOperator
+- A state filter function
+- A function `true_observations(t,obsdata)` of supplying the truth data as a function of time.
+
+The signature of the forecast operator should be
+forecast!(x,t,foredata::AbstractForecastOperator)
+
+The signature of the forecast operator should be
+observations!(x,t,obsdata::AbstractObservationOperator)
+
+The signature of the Jacobian operator should be
+jacob!(J,x,t,obsdata::AbstractObservationOperator)
+=#
 
 ##### ANALYSIS STEPS VIA DIFFERENT FLAVORS OF ENKF #####
 

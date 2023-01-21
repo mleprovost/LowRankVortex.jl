@@ -26,6 +26,18 @@ include("analytical_jacobian_pressure.jl")
 include("symmetric_pressure.jl")
 include("symmetric_analytical_jacobian_pressure.jl")
 include("symmetric_analytical_jacobian_pressure_freestream.jl")
+
+include("general/types.jl")
+include("general/ensemble.jl")
+include("general/observation.jl")
+include("general/forecast.jl")
+include("general/pressure_utilities.jl")
+include("general/state_utilities.jl")
+include("general/jacobian.jl")
+include("general/vortex.jl")
+include("general/api.jl")
+include("general/classification.jl")
+
 include("forecast.jl")
 include("generate_twin_experiment.jl")
 include("enkf.jl")
@@ -36,15 +48,7 @@ include("lowrankenkf_vortexassim.jl")
 include("lowrankenkf_symmetric_vortexassim.jl")
 include("adaptive_lowrankenkf_symmetric_vortexassim.jl")
 
-include("general/types.jl")
-include("general/ensemble.jl")
-include("general/observation.jl")
-include("general/pressure_utilities.jl")
-include("general/state_utilities.jl")
-include("general/jacobian.jl")
-include("general/vortex.jl")
-include("general/api.jl")
-include("general/classification.jl")
+
 
 
 
