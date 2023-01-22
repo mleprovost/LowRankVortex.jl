@@ -84,7 +84,7 @@ function gramians(obs::AbstractObservationOperator{Nx,Ny},Σϵ,X::EnsembleMatrix
     Dx = sqrt(Σx)
 
     fact = min(1.0,1.0/(Ne-1)) # why isn't this just 1/Ne? it's a first-order statistic
-    #fact = min(1.0,1.0/Ne) # why isn't this just 1/Ne? it's a first-order statistic
+    #fact = min(1.0,1.0/Ne)
 
     for j in 1:Ne
 

@@ -372,7 +372,7 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
      #ϵ = create_ensemble(Ne,zeros(Ny),Σϵ)
 
 
-     enkf_kalman_update!(algo,X,Cx_history,Cy_history,rxhist,ryhist,tnext,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream)
+     enkf_kalman_update!(algo,X,Cx_history,Cy_history,rxhist,ryhist,tnext,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac,Jac_data,config,withfreestream)
 
 	   # Filter state
      apply_filter!(X,Ne,Nx,Ny,odata)
@@ -414,7 +414,7 @@ enkf_kalman_update!(algo::StochEnKFParameters,args...) = _senkf_kalman_update!(a
 enkf_kalman_update!(algo::LREnKFParameters,args...) = _lrenkf_kalman_update!(algo,args...)
 
 
-function _senkf_kalman_update!(algo,X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream)
+function _senkf_kalman_update!(algo,X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac,Jac_data,config,withfreestream)
 
   # The implementation of the stochastic EnKF follows
   # Form the perturbation matrix for the state
@@ -446,13 +446,12 @@ end
 
 ### Low-rank ENKF ####
 
-function _lrenkf_kalman_update!(algo::LREnKFParameters{isadaptive},X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream) where isadaptive
+function _lrenkf_kalman_update!(algo::LREnKFParameters{isadaptive},X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac,Jac_data,config,withfreestream) where isadaptive
 
-  Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob = Jac_data
+  wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob = Jac_data
 
-  rxdefault = algo.rxdefault
-  rydefault = algo.rydefault
-  ratio = algo.ratio
+  @unpack rxdefault, rydefault, ratio, odata = algo
+
 
   # Compute marginally the standard deviation of the state ensemble
   Dx = Diagonal(std(X[Ny+1:Ny+Nx, :]; dims = 2)[:,1])
@@ -475,6 +474,7 @@ function _lrenkf_kalman_update!(algo::LREnKFParameters{isadaptive},X,Cx_history,
       symmetric_analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
                       config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), Freestream(config.U), 1:config.Nv, t)
     end
+
 
     Jacj = view(Jac,:,1:3*config.Nv)
     Cx .+= 1/(Ne-1)*(inv(Dϵ)*Jacj*Dx)'*(inv(Dϵ)*Jacj*Dx)
@@ -574,7 +574,6 @@ allocate_forecast_cache(X,Nx,Ny,config,::AbstractSeqFilter) = allocate_velocity(
 allocate_jacobian_cache(Nv,Ny,::StochEnKFParameters) = nothing
 
 function allocate_jacobian_cache(Nv,Ny,::LREnKFParameters)
-  Jac = zeros(Ny, 6*Nv)
 	wtarget = zeros(ComplexF64, Ny)
 
 	dpd = zeros(ComplexF64, Ny, 2*Nv)
@@ -587,7 +586,7 @@ function allocate_jacobian_cache(Nv,Ny,::LREnKFParameters)
 	Ctsblob = zeros(ComplexF64, Ny, 2*Nv)
 	∂Ctsblob = zeros(Ny, 2*Nv)
 
-  return Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob
+  return wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob
 end
 #########
 
