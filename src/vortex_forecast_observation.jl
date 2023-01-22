@@ -93,8 +93,10 @@ function forecast(x::AbstractVector,t,Δt,fdata::SymmetricVortexForecast{Nx,with
 
 end
 
+abstract type AbstractCartesianVortexObservations{Nx,Ny} <: AbstractObservationOperator{Nx,Ny} end
+
 # This one is meant to replace the legacy pressure functions
-struct SymmetricVortexPressureObservations{Nx,Ny,withfreestream,ST} <: AbstractObservationOperator{Nx,Ny}
+struct SymmetricVortexPressureObservations{Nx,Ny,withfreestream,ST} <: AbstractCartesianVortexObservations{Nx,Ny}
     sens::ST
     config::VortexConfig
 		wtarget :: Vector{ComplexF64}
@@ -166,6 +168,7 @@ This function would typically be used before and after the analysis step to enfo
 """
 state_filter!(x, obs::SymmetricVortexPressureObservations) = symmetry_state_filter!(x, obs.config)
 
+# DEPENDS ON STATE ARRANGEMENT
 function symmetry_state_filter!(x, config::VortexConfig)
 	@inbounds for j=1:config.Nv
 		# Ensure that vortices stay above the x axis
@@ -177,8 +180,97 @@ function symmetry_state_filter!(x, config::VortexConfig)
 end
 
 
+# Localization
+function dobsobs(obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx,Ny}
+		@unpack sens, config = obs
+    dYY = zeros(Ny, Ny)
+    # Exploit symmetry of the distance matrix dYY
+    for i=1:Ny
+        for j=1:i-1
+            dij = abs(sens[i] - sens[j])
+            dYY[i,j] = dij
+            dYY[j,i] = dij
+        end
+    end
+    return dYY
+end
 
-#### OLD STUFF ####
+# DEPENDS ON STATE ARRANGEMENT
+#function dstateobs(X::BasicEnsembleMatrix{Nx,Ne}, obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx,Ny,Ne}
+function dstateobs(X, obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx,Ny}
+
+	@unpack config, sens = obs
+	@unpack Nv = config
+
+	Ne = size(X,2)
+
+	dXY = zeros(Nx, Ny)
+	for i in 1:Ne
+		#zi, Γi = state_to_positions_and_strengths(X(i),config)
+		xi = X[Ny+1:Ny+Nx, i]
+		zi = map(l->xi[3*l-2] + im*xi[3*l-1], 1:Nv)
+
+		for J in 1:Nv
+				for k in 1:Ny
+						dXY[J,k] += abs(zi[J] - sens[k])
+				end
+		end
+	end
+	dXY ./= Ne
+	return dXY
+end
+
+# DEPENDS ON STATE ARRANGEMENT
+function apply_state_localization!(Σxy,X,Lxy,obs::AbstractCartesianVortexObservations)
+	@unpack config = obs
+  dxy = dstateobs(X, obs)
+  Gxy = gaspari.(dxy./Lxy)
+
+  for J=1:config.Nv
+      for i=-2:0
+         Σxy[3*J+i,:] .*= Gxy[J,:]
+      end
+  end
+  return nothing
+end
+
+
+
+#### OLD STUFF, to be removed ####
+
+function dobsobs(config::VortexConfig)
+    Ny = length(config.ss)
+    dYY = zeros(Ny, Ny)
+    # Exploit symmetry of the distance matrix dYY
+    for i=1:Ny
+        for j=1:i-1
+            dij = abs(config.ss[i] - config.ss[j])
+            dYY[i,j] = dij
+            dYY[j,i] = dij
+        end
+    end
+    return dYY
+end
+
+function dstateobs(X, Ny, Nx, config::VortexConfig)
+    Nypx, Ne = size(X)
+    @assert Nypx == Ny + Nx
+    @assert Ny == length(config.ss)
+    Nv = config.Nv
+    dXY = zeros(Nv, Ny, Ne)
+
+    for i=1:Ne
+        xi = X[Ny+1:Ny+Nx, i]
+        zi = map(l->xi[3*l-2] + im*xi[3*l-1], 1:Nv)
+
+        for J=1:Nv
+            for k=1:Ny
+                dXY[J,k,i] = abs(zi[J] - config.ss[k])
+            end
+        end
+    end
+    return mean(dXY, dims = 3)[:,:,1]
+end
 
 vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool = false) = vortex(X, t, Ny, Nx, cachevels, config, serial, withfreestream = withfreestream)
 

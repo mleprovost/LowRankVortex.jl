@@ -220,42 +220,6 @@ function (ϵ::RecipeInflation)(x::AbstractVector{Float64}, config::VortexConfig)
 	end
 end
 
-### Localization routines ###
-function dstateobs(X, Ny, Nx, config::VortexConfig)
-    Nypx, Ne = size(X)
-    @assert Nypx == Ny + Nx
-    @assert Ny == length(config.ss)
-    Nv = config.Nv
-    dXY = zeros(Nv, Ny, Ne)
-
-    for i=1:Ne
-        xi = X[Ny+1:Ny+Nx, i]
-        zi = map(l->xi[3*l-2] + im*xi[3*l-1], 1:Nv)
-
-        for J=1:Nv
-            for k=1:Ny
-                dXY[J,k,i] = abs(zi[J] - config.ss[k])
-            end
-        end
-    end
-    return mean(dXY, dims = 3)[:,:,1]
-end
-
-function dobsobs(config::VortexConfig)
-    Ny = length(config.ss)
-    dYY = zeros(Ny, Ny)
-    # Exploit symmetry of the distance matrix dYY
-    for i=1:Ny
-        for j=1:i-1
-            dij = abs(config.ss[i] - config.ss[j])
-            dYY[i,j] = dij
-            dYY[j,i] = dij
-        end
-    end
-    return dYY
-end
-
-
 
 """
 This routine sequentially assimilates pressure observations collected at locations `config.ss` into the ensemble matrix `X`.
@@ -317,7 +281,7 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
 	Xa = Array{Float64,2}[]
 	push!(Xa, copy(state(X, Ny, Nx)))
 
-  Jac = zeros(Ny, 2*Nx)
+  Jac = zeros(Ny, Nx)
 
   # Cache variable for the velocities
   cachevels = allocate_forecast_cache(X,Nx,Ny,config,algo)
@@ -332,7 +296,7 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
   Cx_history = Array{Float64,2}[]
   Cy_history = Array{Float64,2}[]
 
-  Gyy = sensor_localization_operator(config,algo)
+  Gyy = sensor_localization_operator(algo)
 
 	# Run the ensemble filter
 	@showprogress for i=1:length(Acycle)
@@ -437,7 +401,7 @@ function _senkf_kalman_update!(algo,X,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,y
   b = Σy\(ystar .- (X[1:Ny,:] + ϵ))
 
   Σxy = Xpert*HXpert'
-  apply_state_localization!(Σxy,X,Nx,Ny,config,algo)
+  apply_state_localization!(Σxy,X,algo)
 
   view(X,Ny+1:Ny+Nx,:) .+= Σxy*b
 
@@ -474,7 +438,7 @@ function _lrenkf_kalman_update!(algo::LREnKFParameters{isadaptive},X,Cx_history,
       symmetric_analytical_jacobian_pressure!(Jac, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
                       config.ss, vcat(state_to_lagrange(X[Ny+1:Ny+Nx,j], config)...), Freestream(config.U), 1:config.Nv, t)
     end
-
+    #jacob!(J,X(j))
 
     Jacj = view(Jac,:,1:3*config.Nv)
     Cx .+= 1/(Ne-1)*(inv(Dϵ)*Jacj*Dx)'*(inv(Dϵ)*Jacj*Dx)
@@ -553,6 +517,7 @@ end
 
 ### Utilities ####
 
+# Legacy version
 function apply_filter!(X,Ne,Nx,Ny,odata::AbstractObservationOperator)
   @inbounds for i=1:Ne
     x = view(X, Ny+1:Ny+Nx, i)
@@ -597,31 +562,24 @@ allocate_observation_gramian(Ny,::StochEnKFParameters) = nothing
 allocate_state_gramian(Nx,::LREnKFParameters) = zeros(Nx,Nx)
 allocate_observation_gramian(Ny,::LREnKFParameters) = zeros(Ny,Ny)
 
-function sensor_localization_operator(config,algo::StochEnKFParameters{true})
-  dyy = dobsobs(config)
-  return gaspari.(dyy./algo.Lyy)
+function sensor_localization_operator(algo::StochEnKFParameters{true})
+  @unpack odata, Lyy = algo
+  dyy = dobsobs(odata)
+  return gaspari.(dyy./Lyy)
 end
 
-sensor_localization_operator(config,::AbstractSeqFilter) = nothing
+sensor_localization_operator(::AbstractSeqFilter) = nothing
 
-function apply_sensor_localization!(Σy,Gyy,algo::StochEnKFParameters{true})
+function apply_sensor_localization!(Σy,Gyy,::StochEnKFParameters{true})
+  Σy .*= Gyy
+  return nothing
 end
 
 apply_sensor_localization!(Σy,Gyy,::AbstractSeqFilter) = nothing
 
-function apply_state_localization!(Σxy,X,Nx,Ny,config,algo::StochEnKFParameters{true})
-  dxy = dstateobs(X, Ny, Nx, config)
-  Gxy = gaspari.(dxy./algo.Lxy)
+apply_state_localization!(Σxy,X,algo::StochEnKFParameters{true}) = apply_state_localization!(Σxy,X,algo.Lxy,algo.odata)
 
-  for J=1:config.Nv
-      for i=-2:0
-         Σxy[3*J+i,:] .*= Gxy[J,:]
-      end
-  end
-  return nothing
-end
-
-apply_state_localization!(Σxy,X,Nx,Ny,config,::AbstractSeqFilter) = nothing
+apply_state_localization!(Σxy,X,::AbstractSeqFilter) = nothing
 
 
 ###### THINGS THAT ARE SPECIFIC TO VORTEX PROBLEM #######
