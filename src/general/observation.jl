@@ -24,38 +24,40 @@ function loglikelihood(x,ystar,Σϵ,obs::AbstractObservationOperator)
 end
 
 """
-    observations(x::AbstractVector,obs::AbstractObservationOperator) -> X
+    observations(x::AbstractVector,t::Float64,obs::AbstractObservationOperator) -> X
 
-Compute the observation function `h` for state `x`.
+Compute the observation function `h` for state `x` at time `t`.
 The function `h` should take as inputs a vector of measurement points (`sens`), a vector of vortices,
 and the configuration data `config`.
 """
-function observations(x::AbstractVector,obs::AbstractObservationOperator) end
+function observations(x::AbstractVector,t,obs::AbstractObservationOperator) end
 
 """
-    observations!(Y::EnsembleMatrix,X::EnsembleMatrix,obs::AbstractObservationOperator)
+    observations!(Y::EnsembleMatrix,X::EnsembleMatrix,t::Float64,obs::AbstractObservationOperator)
 
 Compute the observation function `h` for each of the states in `X` and place them in `Y`.
 The function `h` should take as inputs a Ny-dimensional vector of measurement points (`sens`), a vector of vortices,
 and the configuration data `config`.
 """
-function observations!(Y::EnsembleMatrix{Ny,Ne},X::EnsembleMatrix{Nx,Ne},obs::AbstractObservationOperator{Nx,Ny}) where {Nx,Ny,Ne}
+function observations!(Y::EnsembleMatrix{Ny,Ne},X::EnsembleMatrix{Nx,Ne},t,obs::AbstractObservationOperator{Nx,Ny}) where {Nx,Ny,Ne}
   for j in 1:Ne
-      Y(j) .= observations(X(j),obs)
+      Y(j) .= observations(X(j),t,obs)
   end
   return Y
 end
 
 """
-    jacob!(J,x::AbstractVector,obs::AbstractObservationOperator)
+    jacob!(J,x::AbstractVector,t::Float64,obs::AbstractObservationOperator)
 
 Compute the Jacobian of the observation function at state `x` and return it in `J`.
 """
-function jacob!(J,x::AbstractVector,obs::AbstractObservationOperator) end
+function jacob!(J,x::AbstractVector,t,obs::AbstractObservationOperator) end
+
 
 # Pressure
 
-struct PressureObservations{Nx,Ny,ST,CT} <: LowRankVortex.AbstractObservationOperator{Nx,Ny}
+
+struct PressureObservations{Nx,Ny,ST,CT} <: AbstractObservationOperator{Nx,Ny}
     sens::ST
     config::CT
 end
@@ -71,13 +73,13 @@ function PressureObservations(sens::AbstractVector,config::VortexConfig)
     return PressureObservations{3*config.Nv,length(sens),typeof(sens),typeof(config)}(sens,config)
 end
 
-function observations(x::AbstractVector,obs::PressureObservations)
+function observations(x::AbstractVector,t,obs::PressureObservations)
   @unpack config, sens = obs
   v = state_to_lagrange_reordered(x,config)
   return _pressure(sens,v,config)
 end
 
-function jacob!(J,x::AbstractVector,obs::PressureObservations)
+function jacob!(J,x::AbstractVector,t,obs::PressureObservations)
     @unpack config, sens = obs
     v = state_to_lagrange_reordered(x,config)
     return _pressure_jacobian!(J,sens,v,config)
@@ -99,7 +101,7 @@ physical_space_sensors(sens,body::Bodies.ConformalBody) = Bodies.conftransform(s
 
 # Force
 
-struct ForceObservations{Nx,Ny,CT} <: LowRankVortex.AbstractObservationOperator{Nx,Ny}
+struct ForceObservations{Nx,Ny,CT} <: AbstractObservationOperator{Nx,Ny}
     config::CT
 end
 
@@ -112,13 +114,13 @@ function ForceObservations(config::VortexConfig)
     return ForceObservations{3*config.Nv,3,typeof(config)}(config)
 end
 
-function observations(x::AbstractVector,obs::ForceObservations)
+function observations(x::AbstractVector,t,obs::ForceObservations)
   @unpack config = obs
   v = state_to_lagrange_reordered(x,config)
   return analytical_force(v,config)
 end
 
-function jacob!(J,x::AbstractVector,obs::ForceObservations)
+function jacob!(J,x::AbstractVector,t,obs::ForceObservations)
     @unpack config = obs
     v = state_to_lagrange_reordered(x,config)
     analytical_force_jacobian!(J,v,config)

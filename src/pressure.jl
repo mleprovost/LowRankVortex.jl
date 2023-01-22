@@ -3,6 +3,8 @@ export pressure!, pressure,
        pressure_AD,
        measure_state
 
+
+# THIS WILL GET REPLACED BY EXTENSION OF `observations` operator
 """
 Evaluates the pressure induced at `config.ss` by the regularized point vortices stored in `state`,
 and an optional freestream of amplitude `config.U`.

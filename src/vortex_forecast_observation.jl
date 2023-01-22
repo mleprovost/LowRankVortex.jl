@@ -1,31 +1,31 @@
-### Forecasting operators for vortex problems ####
+### Forecasting and observation operators for vortex problems ####
 
-export VortexForecastOperator, SymmetricVortexForecastOperator
+export VortexForecast, SymmetricVortexForecast, SymmetricVortexPressureObservations
 
 export vortex, symmetric_vortex # These should be removed
 
 import TransportBasedInference: Parallel, Serial, Thread # These should not be necessary
 
 
-struct VortexForecastOperator{Nx,withfreestream,CVT} <: AbstractForecastOperator{Nx}
+struct VortexForecast{Nx,withfreestream,CVT} <: AbstractForecastOperator{Nx}
 		config :: VortexConfig
 		cachevels :: CVT
 end
 
 """
-		VortexForecastOperator(config::VortexConfig)
+		VortexForecast(config::VortexConfig)
 
 Allocate the structure for forecasting of vortex dynamics
 """
-function VortexForecastOperator(config::VortexConfig)
+function VortexForecast(config::VortexConfig)
 	withfreestream = config.U == 0.0 ? false : true
 	Nx = 3*config.Nv
 	cachevels = allocate_velocity(state_to_lagrange(zeros(Nx), config))
-	SymmetricVortexForecastOperator{Nx,withfreestream,typeof(cachevels)}(config,cachevels)
+	VortexForecast{Nx,withfreestream,typeof(cachevels)}(config,cachevels)
 end
 
 
-function forecast(x::AbstractVector,t,Δt,fdata::VortexForecastOperator{Nx,withfreestream}) where {Nx,withfreestream}
+function forecast(x::AbstractVector,t,Δt,fdata::VortexForecast{Nx,withfreestream}) where {Nx,withfreestream}
 	@unpack config, cachevels = fdata
 	@unpack U, advect_flag = config
 
@@ -49,26 +49,25 @@ function forecast(x::AbstractVector,t,Δt,fdata::VortexForecastOperator{Nx,withf
 
 end
 
-struct SymmetricVortexForecastOperator{Nx,withfreestream,CVT} <: AbstractForecastOperator{Nx}
+struct SymmetricVortexForecast{Nx,withfreestream,CVT} <: AbstractForecastOperator{Nx}
 		config :: VortexConfig
 		cachevels :: CVT
 end
 
-
 """
-		SymmetricVortexForecastOperator(config::VortexConfig)
+		SymmetricVortexForecast(config::VortexConfig)
 
 Allocate the structure for forecasting of vortex dynamics with symmetry
 about the x axis.
 """
-function SymmetricVortexForecastOperator(config::VortexConfig)
+function SymmetricVortexForecast(config::VortexConfig)
 	withfreestream = config.U == 0.0 ? false : true
 	Nx = 3*config.Nv
 	cachevels = allocate_velocity(state_to_lagrange(zeros(Nx), config))
-	SymmetricVortexForecastOperator{Nx,withfreestream,typeof(cachevels)}(config,cachevels)
+	SymmetricVortexForecast{Nx,withfreestream,typeof(cachevels)}(config,cachevels)
 end
 
-function forecast(x::AbstractVector,t,Δt,fdata::SymmetricVortexForecastOperator{Nx,withfreestream}) where {Nx,withfreestream}
+function forecast(x::AbstractVector,t,Δt,fdata::SymmetricVortexForecast{Nx,withfreestream}) where {Nx,withfreestream}
 	@unpack config, cachevels = fdata
 	@unpack U, advect_flag = config
 
@@ -94,6 +93,90 @@ function forecast(x::AbstractVector,t,Δt,fdata::SymmetricVortexForecastOperator
 
 end
 
+# This one is meant to replace the legacy pressure functions
+struct SymmetricVortexPressureObservations{Nx,Ny,withfreestream,ST} <: AbstractObservationOperator{Nx,Ny}
+    sens::ST
+    config::VortexConfig
+		wtarget :: Vector{ComplexF64}
+		dpd :: Matrix{ComplexF64}
+		dpdstar :: Matrix{ComplexF64}
+		Css :: Matrix{ComplexF64}
+		Cts :: Matrix{ComplexF64}
+		∂Css :: Matrix{Float64}
+		Ctsblob :: Matrix{ComplexF64}
+		∂Ctsblob :: Matrix{Float64}
+end
+
+function SymmetricVortexPressureObservations(sens::AbstractVector,config::VortexConfig)
+	withfreestream = config.U == 0.0 ? false : true
+
+	Nv = config.Nv
+	Nx = 3*Nv
+	Ny = length(sens)
+
+	wtarget = zeros(ComplexF64, Ny)
+	dpd = zeros(ComplexF64, Ny, 2*Nv)
+	dpdstar = zeros(ComplexF64, Ny, 2*Nv)
+
+	Css = zeros(ComplexF64, 2*Nv, 2*Nv)
+	Cts = zeros(ComplexF64, Ny, 2*Nv)
+
+	∂Css = zeros(2*Nv, 2*Nv)
+	Ctsblob = zeros(ComplexF64, Ny, 2*Nv)
+	∂Ctsblob = zeros(Ny, 2*Nv)
+
+	return SymmetricVortexPressureObservations{Nx,length(sens),withfreestream,typeof(sens)}(sens,config,wtarget,dpd,dpdstar,Css,Cts,∂Css,Ctsblob,∂Ctsblob)
+end
+
+function observations(x::AbstractVector,t,obs::SymmetricVortexPressureObservations{Nx,Ny,false}) where {Nx,Ny}
+  @unpack config, sens = obs
+	return pressure(sens, state_to_lagrange(state, config), t)
+end
+
+function observations(x::AbstractVector,t,obs::SymmetricVortexPressureObservations{Nx,Ny,true}) where {Nx,Ny}
+  @unpack config, sens = obs
+	@unpack U = config
+	freestream = Freestream(U)
+	return pressure(sens, state_to_lagrange(state, config), freestream, t)
+end
+
+
+function jacob!(J,x,obs::SymmetricVortexPressureObservations{Nx,Ny,false}) where {Nx,Ny}
+	@unpack sens,config,wtarget,dpd,dpdstar,Css,Cts,∂Css,Ctsblob,∂Ctsblob = obs
+
+	return symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
+														sens, vcat(state_to_lagrange(x, config)...), 1:config.Nv, t)
+end
+
+function jacob!(J,x,obs::SymmetricVortexPressureObservations{Nx,Ny,true}) where {Nx,Ny}
+	@unpack sens,config,wtarget,dpd,dpdstar,Css,Cts,∂Css,Ctsblob,∂Ctsblob = obs
+	@unpack U = config
+	freestream = Freestream(U)
+	return symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
+										sens, vcat(state_to_lagrange(x, config)...), freestream, 1:config.Nv, t)
+end
+
+
+
+"""
+A filter function to ensure that the point vortices stay above the x-axis, and retain a positive circulation.
+This function would typically be used before and after the analysis step to enforce those constraints.
+"""
+function symmetry_state_filter!(x, config::VortexConfig)
+	@inbounds for j=1:config.Nv
+		# Ensure that vortices stay above the x axis
+		x[3*j-1] = clamp(x[3*j-1], 1e-2, Inf)
+		# Ensure that the circulation remains positive
+    	x[3*j] = clamp(x[3*j], 0.0, Inf)
+	end
+    return x
+end
+
+
+
+
+
+#### OLD STUFF ####
 
 vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool = false) = vortex(X, t, Ny, Nx, cachevels, config, serial, withfreestream = withfreestream)
 

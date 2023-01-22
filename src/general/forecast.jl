@@ -1,8 +1,8 @@
 # subtypes of AbstractForecastOperator should provide
 #  - an extension of the forecast operator
-#  - an internal cache
+#  - an internal cache in their structure
 
-export forecast, forecast!, AbstractForecastOperator
+export forecast, forecast!, AbstractForecastOperator, IdentityForecastOperator
 
 abstract type AbstractForecastOperator{Nx} end
 
@@ -12,7 +12,12 @@ abstract type AbstractForecastOperator{Nx} end
 Forecast the state `x` at time `t` to its value at the next time `t+Δt`.
 The default forecast function is simply the identity.
 """
-forecast(x,t,Δt,fdata::AbstractForecastOperator) = x
+function forecast(x,t,Δt,::AbstractForecastOperator) end
+
+struct IdentityForecastOperator{Nx} <: AbstractForecastOperator{Nx} end
+
+forecast(x,t,Δt,::IdentityForecastOperator) = x
+
 
 """
     forecast!(X::BasicEnsembleMatrix,t,Δt,fdata::AbstractForecastOperator)
