@@ -70,7 +70,6 @@ A structure for parameters of the the stochastic ensemble Kalman filter (LREnKF)
 ## Fields
 - `fdata::AbstractForecastOperator`: "Forecast data"
 - `odata::AbstractObservationOperator`: "Observation data"
-- `state_filter!::Function`: "Filter function"
 - `ϵy::AdditiveInflation`: "Standard deviations of the measurement noise distribution"
 - `Δtdyn::Float64`: "Time step dynamic"
 - `Δtobs::Float64`: "Time step observation"
@@ -85,9 +84,6 @@ struct StochEnKFParameters{islocal,FT,OT}<:AbstractSeqFilter
 
     "Observation data"
     odata::OT
-
-    "Filter function"
-    state_filter!::Function
 
     "Standard deviations of the measurement noise distribution"
     ϵy::AdditiveInflation
@@ -105,16 +101,12 @@ struct StochEnKFParameters{islocal,FT,OT}<:AbstractSeqFilter
     Lxy::Float64
 end
 
-function StochEnKFParameters(fdata::AbstractForecastOperator,odata::AbstractObservationOperator,state_filter!::Function, ϵy::AdditiveInflation,
+function StochEnKFParameters(fdata::AbstractForecastOperator,odata::AbstractObservationOperator,ϵy::AdditiveInflation,
     Δtdyn, Δtobs; islocal = false, Lyy = 1.0e10, Lxy = 1.0e10)
     @assert norm(mod(Δtobs, Δtdyn))<1e-12 "Δtobs should be an integer multiple of Δtdyn"
 
-    return StochEnKFParameters{islocal,typeof(fdata),typeof(odata)}(fdata,odata,state_filter!, ϵy, Δtdyn, Δtobs, Lyy, Lxy)
+    return StochEnKFParameters{islocal,typeof(fdata),typeof(odata)}(fdata,odata, ϵy, Δtdyn, Δtobs, Lyy, Lxy)
 end
-
-# If no filtering function is provided, use the identity in the constructor.
-StochEnKFParameters(fdata::AbstractForecastOperator,odata::AbstractObservationOperator,ϵy::AdditiveInflation, Δtdyn, Δtobs; kwargs...) = StochEnKFParameters(fdata, odata, DEFAULT_STATE_FILTER, ϵy, Δtdyn, Δtobs; kwargs...)
-
 
 function Base.show(io::IO, ::StochEnKFParameters{islocal}) where {islocal}
 	println(io,"Stochastic EnKF with localization = $(islocal)")
@@ -129,7 +121,6 @@ Le Provost, Baptista, Marzouk, and Eldredge, "A low-rank ensemble Kalman filter 
 ## Fields
 - `fdata::AbstractForecastOperator`: "Forecast data"
 - `odata::AbstractObservationOperator`: "Observation data"
-- `state_filter!::Function`: "Filter function"
 - `ϵy::AdditiveInflation`: "Standard deviations of the measurement noise distribution"
 - `Δtdyn::Float64`: "Time step dynamic"
 - `Δtobs::Float64`: "Time step observation"
@@ -147,9 +138,6 @@ struct LREnKFParameters{isadaptive,FT,OT}<:AbstractSeqFilter
 
     "Observation data"
     odata::OT
-
-    "Filter function"
-    state_filter!::Function
 
     "Standard deviations of the measurement noise distribution"
     ϵy::AdditiveInflation
@@ -171,14 +159,11 @@ struct LREnKFParameters{isadaptive,FT,OT}<:AbstractSeqFilter
 end
 
 
-function LREnKFParameters(fdata::AbstractForecastOperator,odata::AbstractObservationOperator,state_filter!::Function, ϵy::AdditiveInflation,
+function LREnKFParameters(fdata::AbstractForecastOperator,odata::AbstractObservationOperator, ϵy::AdditiveInflation,
     Δtdyn, Δtobs; isadaptive = true, rxdefault::Int = RXDEFAULT, rydefault::Int = RYDEFAULT, ratio::Float64 = DEFAULT_ADAPTIVE_RATIO)
     @assert norm(mod(Δtobs, Δtdyn))<1e-12 "Δtobs should be an integer multiple of Δtdyn"
-    return LREnKFParameters{isadaptive,typeof(fdata),typeof(odata)}(fdata,odata,state_filter!, ϵy, Δtdyn, Δtobs, rxdefault, rydefault, ratio)
+    return LREnKFParameters{isadaptive,typeof(fdata),typeof(odata)}(fdata,odata, ϵy, Δtdyn, Δtobs, rxdefault, rydefault, ratio)
 end
-
-# If no filtering function is provided, use the identity in the constructor.
-LREnKFParameters(fdata::AbstractForecastOperator,odata::AbstractObservationOperator,ϵy::AdditiveInflation,Δtdyn, Δtobs; kwargs...) = LREnKFParameters(fdata, odata, DEFAULT_STATE_FILTER, ϵy, Δtdyn, Δtobs; kwargs...)
 
 
 function Base.show(io::IO, ::LREnKFParameters{isadaptive}) where isadaptive
@@ -375,7 +360,7 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
      #inflate && additive_inflation!(X,Σx)
 
 	   # Filter state
-     apply_filter!(X,Ne,Nx,Ny,config,algo)
+     apply_filter!(X,Ne,Nx,Ny,odata)
 
 
 	   # Evaluate the observation operator for the different ensemble members
@@ -384,11 +369,13 @@ function enkf(algo::AbstractSeqFilter, X, tspan::Tuple{S,S}, config::VortexConfi
 
 	   # Generate samples from the observation noise
 	   ϵ = algo.ϵy.σ*randn(Ny, Ne) .+ algo.ϵy.m
+     #ϵ = create_ensemble(Ne,zeros(Ny),Σϵ)
+
 
      enkf_kalman_update!(algo,X,Cx_history,Cy_history,rxhist,ryhist,tnext,ϵ,ystar,Ne,Nx,Ny,Cx,Cy,Gyy,Jac_data,config,withfreestream)
 
 	   # Filter state
-     apply_filter!(X,Ne,Nx,Ny,config,algo)
+     apply_filter!(X,Ne,Nx,Ny,odata)
 
      ######
 
@@ -414,6 +401,9 @@ observations!(x,t,obsdata::AbstractObservationOperator)
 
 The signature of the Jacobian operator should be
 jacob!(J,x,t,obsdata::AbstractObservationOperator)
+
+The signature of the state filter function should be
+state_filter!(x,obsdata::AbstractObservationOperator)
 =#
 
 ##### ANALYSIS STEPS VIA DIFFERENT FLAVORS OF ENKF #####
@@ -563,10 +553,17 @@ end
 
 ### Utilities ####
 
-function apply_filter!(X,Ne,Nx,Ny,config,algo)
+function apply_filter!(X,Ne,Nx,Ny,odata::AbstractObservationOperator)
   @inbounds for i=1:Ne
     x = view(X, Ny+1:Ny+Nx, i)
-    x .= algo.state_filter!(x, config)
+    state_filter!(x, odata)
+  end
+  return X
+end
+
+function apply_filter!(X::BasicEnsembleMatrix{Nx,Ne},odata::AbstractObservationOperator) where {Nx,Ne}
+  @inbounds for i=1:Ne
+    state_filter!(X(i), odata)
   end
   return X
 end

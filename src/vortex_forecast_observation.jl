@@ -159,9 +159,13 @@ end
 
 
 """
+		state_filter!(x,obs::SymmetricVortexPressureObservations)
+
 A filter function to ensure that the point vortices stay above the x-axis, and retain a positive circulation.
 This function would typically be used before and after the analysis step to enforce those constraints.
 """
+state_filter!(x, obs::SymmetricVortexPressureObservations) = symmetry_state_filter!(x, obs.config)
+
 function symmetry_state_filter!(x, config::VortexConfig)
 	@inbounds for j=1:config.Nv
 		# Ensure that vortices stay above the x axis
@@ -171,8 +175,6 @@ function symmetry_state_filter!(x, config::VortexConfig)
 	end
     return x
 end
-
-
 
 
 

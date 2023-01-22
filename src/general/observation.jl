@@ -5,6 +5,7 @@
 # Nx is number of states, Ny is number of observations
 
 export observations!, observations, AbstractObservationOperator, jacob!,
+       state_filter!,
         PressureObservations, ForceObservations, physical_space_sensors,
         loglikelihood
 
@@ -53,6 +54,8 @@ Compute the Jacobian of the observation function at state `x` and return it in `
 """
 function jacob!(J,x::AbstractVector,t,obs::AbstractObservationOperator) end
 
+
+state_filter!(x,obs::AbstractObservationOperator) = x
 
 # Pressure
 
