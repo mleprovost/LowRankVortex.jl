@@ -4,7 +4,7 @@ export VortexForecast, SymmetricVortexForecast, SymmetricVortexPressureObservati
 
 export vortex, symmetric_vortex # These should be removed
 
-import TransportBasedInference: Parallel, Serial, Thread # These should not be necessary
+#import TransportBasedInference: Parallel, Serial, Thread # These should not be necessary
 
 
 struct VortexForecast{Nx,withfreestream,CVT} <: AbstractForecastOperator{Nx}
@@ -232,113 +232,4 @@ function apply_state_localization!(Σxy,X,Lxy,obs::AbstractCartesianVortexObserv
       end
   end
   return nothing
-end
-
-
-
-#### OLD STUFF, to be removed ####
-
-function dobsobs(config::VortexConfig)
-    Ny = length(config.ss)
-    dYY = zeros(Ny, Ny)
-    # Exploit symmetry of the distance matrix dYY
-    for i=1:Ny
-        for j=1:i-1
-            dij = abs(config.ss[i] - config.ss[j])
-            dYY[i,j] = dij
-            dYY[j,i] = dij
-        end
-    end
-    return dYY
-end
-
-function dstateobs(X, Ny, Nx, config::VortexConfig)
-    Nypx, Ne = size(X)
-    @assert Nypx == Ny + Nx
-    @assert Ny == length(config.ss)
-    Nv = config.Nv
-    dXY = zeros(Nv, Ny, Ne)
-
-    for i=1:Ne
-        xi = X[Ny+1:Ny+Nx, i]
-        zi = map(l->xi[3*l-2] + im*xi[3*l-1], 1:Nv)
-
-        for J=1:Nv
-            for k=1:Ny
-                dXY[J,k,i] = abs(zi[J] - config.ss[k])
-            end
-        end
-    end
-    return mean(dXY, dims = 3)[:,:,1]
-end
-
-vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool = false) = vortex(X, t, Ny, Nx, cachevels, config, serial, withfreestream = withfreestream)
-
-"""
-This routine advects the regularized point vortices of the different ensemble members stored in X by a time step config.Δt.
-"""
-function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestream::Bool=false)
-	Nypx, Ne = size(X)
-	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
-
-	freestream = Freestream(config.U)
-
-	@inbounds for i = 1:Ne
-		col = view(X, Ny+1:Nypx, i)
-		source = state_to_lagrange(col, config)
-
-		# Compute the induced velocity (by exploiting the symmetry of the problem)
-		reset_velocity!(cachevels, source)
-		self_induce_velocity!(cachevels, source, t)
-
-		if withfreestream == true
-			induce_velocity!(cachevels, source, freestream, t)
-		end
-
-		# Advect the system
-		if config.advect_flag
-			advect!(source, source, cachevels, config.Δt)
-		end
-
-		X[Ny+1:Nypx, i] .= lagrange_to_state(source, config)
-	end
-
-	return X, t + config.Δt
-end
-
-"""
-This routine advects the point vortices of the different ensemble members stored in X by a time step config.Δt.
-Note that this version assumes that for each vortex with strength Γ_J located at z_J,
-there is a mirror point vortex with strength -Γ_J located at conj(z_J).
-"""
-symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool=false) = symmetric_vortex(X, t, Ny, Nx, cachevels, config, serial; withfreestream = withfreestream)
-
-function symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestream::Bool=false)
-	Nypx, Ne = size(X)
-	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
-	freestream = Freestream(config.U)
-	@inbounds for i = 1:Ne
-		col = view(X, Ny+1:Nypx, i)
-		source = state_to_lagrange(col, config)
-
-		# Compute the induced velocity (by exploiting the symmetry of the problem)
-		reset_velocity!(cachevels, source)
-		self_induce_velocity!(cachevels[1], source[1], t)
-		induce_velocity!(cachevels[1], source[1], source[2], t)
-
-		if withfreestream == true
-			induce_velocity!(cachevels[1], source[1], freestream, t)
-		end
-		# @. cachevels[2] = conj(cachevels[1])
-
-		# We only care about the transport of the top vortices
-		# Advect the system
-		if config.advect_flag
-			advect!(source[1:1], source[1:1], cachevels[1:1], config.Δt)
-		end
-
-		X[Ny+1:Nypx, i] .= lagrange_to_state(source, config)
-	end
-
-	return X, t + config.Δt
 end

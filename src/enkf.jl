@@ -1,111 +1,9 @@
-export StochEnKFParameters, LREnKFParameters, RecipeInflation, LREnKF, filter_state!, dstateobs, dobsobs, enkf
+export StochEnKFParameters, LREnKFParameters, enkf
 
 const RXDEFAULT = 100
 const RYDEFAULT = 100
 const DEFAULT_ADAPTIVE_RATIO = 0.95
 
-
-######### OLD ##########
-
-"""
-A structure for the low-rank ensemble Kalman filter (LREnKF)
-
-References:
-Le Provost, Baptista, Marzouk, and Eldredge, "A low-rank ensemble Kalman filter for elliptic observations", arXiv preprint, 2203.05120, 2022.
-
-## Fields
-- `G::Function`: "Filter function"
-- `ϵy::AdditiveInflation`: "Standard deviations of the measurement noise distribution"
-- `Δtdyn::Float64`: "Time step dynamic"
-- `Δtobs::Float64`: "Time step observation"
-- `isfiltered::Bool`: "Boolean: is state vector filtered"
-"""
-struct LREnKF<:SeqFilter
-    "Filter function"
-    G::Function
-
-    "Standard deviations of the measurement noise distribution"
-    ϵy::AdditiveInflation
-
-    "Time step dynamic"
-    Δtdyn::Float64
-
-    "Time step observation"
-    Δtobs::Float64
-
-    "Boolean: is state vector filtered"
-    isfiltered::Bool
-end
-
-function LREnKF(G::Function, ϵy::AdditiveInflation,
-    Δtdyn, Δtobs; isfiltered = false)
-    @assert norm(mod(Δtobs, Δtdyn))<1e-12 "Δtobs should be an integer multiple of Δtdyn"
-    return LREnKF(G, ϵy, Δtdyn, Δtobs, isfiltered)
-end
-
-# If no filtering function is provided, use the identity in the constructor.
-function LREnKF(ϵy::AdditiveInflation,
-    Δtdyn, Δtobs, Δtshuff; islocal = false)
-    @assert norm(mod(Δtobs, Δtdyn))<1e-12 "Δtobs should be an integer multiple of Δtdyn"
-
-    return LREnKF(x-> x, ϵy, Δtdyn, Δtobs, false)
-end
-
-function Base.show(io::IO, lrenkf::LREnKF)
-	println(io,"LREnKF  with filtered = $(lrenkf.isfiltered)")
-end
-
-struct RecipeInflation <: InflationType
-    "Parameters"
-    p::Array{Float64,1}
-end
-
-
-# Legacy purposes
-filter_state!(a...) = symmetry_state_filter!(a...)
-
-
-# This function apply additive inflation to the state components only,
-# not the measurements, X is an Array{Float64,2} or a view of it
-"""
-Applies the additive inflation `ϵX`, `ϵΓ` to the positions, strengths of the point vortices, respectively.
-The rows Ny+1 to Ny+Nx of `X` contain the state representation for the different ensemble members.
-`X` contains Ne columns (one per each ensemble member) of Ny+Nx lines. The associated observations are stored in the first Ny rows.
-"""
-function (ϵ::RecipeInflation)(X, Ny, Nx, config::VortexConfig)
-	ϵX, ϵΓ = ϵ.p
-	Nv = config.Nv
-	@assert Nx == 3*Nv
-	for col in eachcol(X)
-		if config.Nv > 0
-			for i in 1:Nv
-				col[Ny + 3*(i-1) + 1: Ny + 3*(i-1) + 2] .+= ϵX*randn(2)
-				col[Ny + 3*i] += ϵΓ*randn()
-			end
-		end
-	end
-end
-
-"""
-Applies the additive inflation `ϵX`, `ϵΓ` to the positions, strengths of the point vortices, respectively.
-The vector `x` contains the state representation of the collection of point vortices.
-"""
-function (ϵ::RecipeInflation)(x::AbstractVector{Float64}, config::VortexConfig)
-	ϵX, ϵΓ = ϵ.p
-	Nv = config.Nv
-	Nx = size(x, 1)
-
-	@assert Nx == 3*Nv
-	for i=1:Nv
-		x[3*(i-1) + 1:3*(i-1) + 2] .+= ϵX*randn(2)
-		x[3*(i-1) + 3] += ϵΓ*randn()
-	end
-end
-
-############ END OF OLD ###########
-
-
-############ NEW ###########
 
 abstract type AbstractSeqFilter end
 
@@ -257,9 +155,8 @@ The type of `algo` determines the type of EnKF to be used.
 Optional arguments:
 - `inflate::Bool = true`: True if additive/multiplicative inflation is desired
 - `β::Float64 = 1.0`: Multiplicative inflation parameter
-- `P::Parallel = serial`: Determine whether some steps of the routine can be runned in parallel.
 """
-function enkf(algo::AbstractSeqFilter, X::BasicEnsembleMatrix{Nx,Ne}, Σx, Σϵ, tspan::Tuple{S,S}; inflate::Bool = true, P::Parallel = serial, β = 1.0) where {Nx,Ne,S<:Real}
+function enkf(algo::AbstractSeqFilter, X::BasicEnsembleMatrix{Nx,Ne}, Σx, Σϵ, tspan::Tuple{S,S}; inflate::Bool = true, β = 1.0) where {Nx,Ne,S<:Real}
   @unpack fdata, odata, ytrue, Δtobs, Δtdyn = algo
 
   Ny = measurement_length(odata)

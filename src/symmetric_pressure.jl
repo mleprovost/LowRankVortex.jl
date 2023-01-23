@@ -1,22 +1,7 @@
 # Design optimized routines to compute pressure and its Jacobian if the vortices are placed according to the method of images, and we evaluate the pressure field about the x axis.
 
-export measure_state_symmetric, symmetric_pressure#, analytical_symmetric_jacobian_strength
+export symmetric_pressure#, analytical_symmetric_jacobian_strength
 
-"""
-Evaluates the pressure induced at `config.ss` by the regularized point vortices stored in `state`,
-and an optional freestream of amplitude `config.U`.
-The pressure is computed from the unsteady Bernoulli equation.
-Note that this version assumes that the pressure is calculated at locations along the x-axis.
-For each point vortex, there is a mirror point vortex with conjugate position and opposite strength.
-"""
-function measure_state_symmetric(state, t, config::VortexConfig; withfreestream::Bool = false)
-	if withfreestream == false
-    	return symmetric_pressure(real(config.ss), state_to_lagrange(state, config)[1], t)
-	else
-		freestream = Freestream(config.U)
-		return symmetric_pressure(real(config.ss), state_to_lagrange(state, config)[1], freestream, t)
-	end
-end
 
 # Symmetric pressure calculation for point vortices
 """

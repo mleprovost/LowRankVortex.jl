@@ -31,39 +31,22 @@ struct VortexConfig{BT,ST}
     "Freestream velocity"
     U::ComplexF64
 
-    "Sensor locations" # this is not used anymore
-    ss::ST
-
     "Time step"
     Δt::Float64
 
     "Blob radius"
     δ::Float64
 
-    "Position noise std" # Not used anymore
-    ϵX::Float64
-
-    "Circulation noise std" # Not used anymore
-    ϵΓ::Float64
-
-    "Multiplicative inflation" # Not used anymore
-    β::Float64
-
-    "Observation noise std" # Not used anymore
-    ϵY::Float64
-
     "Advect flag"
     advect_flag::Bool
 
 end
 
-VortexConfig(Nv,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY;advect_flag=true,body=nothing) = VortexConfig(Nv,body,U,ss,Δt,δ,ϵX,ϵΓ,β,ϵY,advect_flag)
-
-VortexConfig(Nv,δ;body=nothing) = VortexConfig(Nv,body,complex(0.0),ComplexF64[],0.0,δ,0.0,0.0,0.0,0.0,false)
-VortexConfig(Nv,U,Δt,δ;advect_flag=true,body=nothing) = VortexConfig(Nv,body,U,ComplexF64[],Δt,δ,0.0,0.0,0.0,0.0,advect_flag)
+VortexConfig(Nv,U,Δt,δ;advect_flag=true,body=nothing) = VortexConfig(Nv,body,U,Δt,δ,advect_flag)
+VortexConfig(Nv,δ;body=nothing) = VortexConfig(Nv,body,complex(0.0),0.0,δ,false)
 
 Base.length(config::VortexConfig) = config.Nv
-statelength(config::VortexConfig) = 3*length(config)
+state_length(config::VortexConfig) = 3*length(config)
 
 
 "A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).

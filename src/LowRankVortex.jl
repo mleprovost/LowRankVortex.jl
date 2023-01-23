@@ -1,7 +1,6 @@
 module LowRankVortex
 
 using Interpolations
-using JLD
 using LinearAlgebra
 using PotentialFlow
 import PotentialFlow.Motions: reset_velocity!
@@ -10,9 +9,7 @@ import PotentialFlow.Blobs
 import PotentialFlow.Elements
 using ProgressMeter
 using Statistics
-using TransportBasedInference
 using NamedColors
-using StaticArrays
 using Distributions
 using UnPack
 

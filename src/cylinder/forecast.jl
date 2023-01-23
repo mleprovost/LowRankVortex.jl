@@ -1,7 +1,5 @@
 export cylinder_vortex
 
-import TransportBasedInference: Parallel, Serial, Thread
-
 
 """
 This routine advects the point vortices of the different ensemble members stored in X by a time step config.Δt.
