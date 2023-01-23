@@ -41,12 +41,6 @@ include("general/classification.jl")
 include("vortex_forecast_observation.jl")
 include("generate_twin_experiment.jl")
 include("enkf.jl")
-include("senkf_vortexassim.jl")
-include("senkf_symmetric_vortexassim.jl")
-include("localized_senkf_symmetric_vortexassim.jl")
-include("lowrankenkf_vortexassim.jl")
-include("lowrankenkf_symmetric_vortexassim.jl")
-include("adaptive_lowrankenkf_symmetric_vortexassim.jl")
 
 
 
@@ -59,9 +53,6 @@ include("cylinder/forecast.jl")
 include("cylinder/generate_twin_experiment.jl")
 #include("cylinder/cylinder_pressure.jl")
 include("cylinder/cylinder_analytical_jacobian_pressure.jl")
-include("cylinder/senkf_cylinder_vortexassim.jl")
-include("cylinder/localized_senkf_cylinder_vortexassim.jl")
-include("cylinder/adaptive_lowrankenkf_cylinder_vortexassim.jl")
 
 
 include("plot_recipes.jl")
