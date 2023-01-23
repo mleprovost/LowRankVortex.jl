@@ -340,11 +340,10 @@ end
 
 ##### ANALYSIS STEPS VIA DIFFERENT FLAVORS OF ENKF #####
 
-### Stochastic ENKF ####
-
 enkf_kalman_update!(algo::StochEnKFParameters,args...) = _senkf_kalman_update!(algo,args...)
 enkf_kalman_update!(algo::LREnKFParameters,args...) = _lrenkf_kalman_update!(algo,args...)
 
+### Stochastic ENKF ####
 
 function _senkf_kalman_update!(algo,X::BasicEnsembleMatrix{Nx,Ne},Y::BasicEnsembleMatrix{Ny,Ne},Σx,Σϵ,Cx_history,Cy_history,rxhist,ryhist,t,ϵ,ystar,Cx,Cy,Gyy,Jac) where {Nx,Ny,Ne}
 
@@ -488,43 +487,12 @@ end
 
 ### Utilities ####
 
-# Legacy version
-function apply_filter!(X,Ne,Nx,Ny,odata::AbstractObservationOperator)
-  @inbounds for i=1:Ne
-    x = view(X, Ny+1:Ny+Nx, i)
-    state_filter!(x, odata)
-  end
-  return X
-end
-
 function apply_filter!(X::BasicEnsembleMatrix{Nx,Ne},odata::AbstractObservationOperator) where {Nx,Ne}
   @inbounds for i=1:Ne
     state_filter!(X(i), odata)
   end
   return X
 end
-
-#### THESE WILL GET REPLACED BY forecast and observation operators ###
-allocate_forecast_cache(X,Nx,Ny,config,::AbstractSeqFilter) = allocate_velocity(state_to_lagrange(X[Ny+1:Ny+Nx,1], config))
-
-allocate_jacobian_cache(Nv,Ny,::StochEnKFParameters) = nothing
-
-function allocate_jacobian_cache(Nv,Ny,::LREnKFParameters)
-	wtarget = zeros(ComplexF64, Ny)
-
-	dpd = zeros(ComplexF64, Ny, 2*Nv)
-	dpdstar = zeros(ComplexF64, Ny, 2*Nv)
-
-	Css = zeros(ComplexF64, 2*Nv, 2*Nv)
-	Cts = zeros(ComplexF64, Ny, 2*Nv)
-
-	∂Css = zeros(2*Nv, 2*Nv)
-	Ctsblob = zeros(ComplexF64, Ny, 2*Nv)
-	∂Ctsblob = zeros(Ny, 2*Nv)
-
-  return wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob
-end
-#########
 
 
 allocate_jacobian(Nx,Ny,::StochEnKFParameters) = nothing
@@ -550,6 +518,7 @@ end
 
 apply_sensor_localization!(Σy,Gyy,::AbstractSeqFilter) = nothing
 
+# Calls a specialized version of apply_state_localization! based on observation operator
 apply_state_localization!(Σxy,X,algo::StochEnKFParameters{true}) = apply_state_localization!(Σxy,X,algo.Lxy,algo.odata)
 
 apply_state_localization!(Σxy,X,::AbstractSeqFilter) = nothing
