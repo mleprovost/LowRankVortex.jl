@@ -5,7 +5,7 @@ import Statistics: cov, mean, std, var
 import LinearAlgebra: norm
 
 export BasicEnsembleMatrix, create_ensemble, ensemble_perturb, whiten,
-        additive_inflation!, multiplicative_inflation!
+        additive_inflation!, multiplicative_inflation!, draw_sample
 
 abstract type EnsembleMatrix{Nx,Ne,T} <: AbstractMatrix{T} end
 
@@ -60,6 +60,18 @@ function create_ensemble(Ne::Int,μx::AbstractVector{T},Σx::Union{AbstractMatri
 
     X = rand(distx,Ne)
     return BasicEnsembleMatrix(X)
+end
+
+"""
+    draw_sample(μx,Σx)
+
+Draw a sample from a Gaussian distribution with the specified mean and covariance matrix.
+"""
+function draw_sample(μx::AbstractVector{T},Σx::Union{AbstractMatrix{T},UniformScaling{T}}) where {T<:Number}
+    Nx = length(μx)
+    distx = MvNormal(μx,Σx)
+
+    return rand(distx)
 end
 
 for op in (:+, :-, :*)
@@ -138,6 +150,17 @@ zero mean and variance given by `Σx`.
 function additive_inflation!(X::BasicEnsembleMatrix{Nx,Ne},Σx::Union{UniformScaling,AbstractMatrix}) where {Nx,Ne}
     X .+= create_ensemble(Ne,zeros(Float64,Nx),Σx)
     return X
+end
+
+"""
+    additive_inflation!(x::AbstractVector,Σx)
+
+Add to `X` (in place) random noise drawn from a Gaussian distribution with
+zero mean and variance given by `Σx`.
+"""
+function additive_inflation!(x::AbstractVector,Σx::Union{UniformScaling,AbstractMatrix})
+    x .+= draw_sample(zero(x),Σx)
+    return x
 end
 
 """

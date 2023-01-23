@@ -20,7 +20,7 @@ A structure to hold the parameters of the vortex simulations
 - `δ::Float64` : blob radius
 - `advect_flag::Bool`: true if the vortex system should be advected
 """
-struct VortexConfig{BT,ST}
+struct VortexConfig{BT}
 
     "Number of vortices"
     Nv::Int64
