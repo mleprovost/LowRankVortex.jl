@@ -93,7 +93,7 @@ function forecast(x::AbstractVector,t,Δt,fdata::SymmetricVortexForecast{Nx,with
 
 end
 
-abstract type AbstractCartesianVortexObservations{Nx,Ny} <: AbstractObservationOperator{Nx,Ny} end
+abstract type AbstractCartesianVortexObservations{Nx,Ny} <: AbstractObservationOperator{Nx,Ny,true} end
 
 # This one is meant to replace the legacy pressure functions
 struct SymmetricVortexPressureObservations{Nx,Ny,withfreestream,ST} <: AbstractCartesianVortexObservations{Nx,Ny}

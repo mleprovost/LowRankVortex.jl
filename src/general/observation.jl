@@ -9,7 +9,8 @@ export observations!, observations, AbstractObservationOperator, jacob!,
         PressureObservations, ForceObservations, physical_space_sensors,
         loglikelihood
 
-abstract type AbstractObservationOperator{Nx,Ny} end
+abstract type AbstractObservationOperator{Nx,Ny,withsensors} end
+
 
 measurement_length(::AbstractObservationOperator{Nx,Ny}) where {Nx,Ny} = Ny
 state_length(::AbstractObservationOperator{Nx,Ny}) where {Nx,Ny} = Nx
@@ -64,7 +65,7 @@ state_filter!(x,obs::AbstractObservationOperator) = x
 # Pressure
 
 
-struct PressureObservations{Nx,Ny,ST,CT} <: AbstractObservationOperator{Nx,Ny}
+struct PressureObservations{Nx,Ny,ST,CT} <: AbstractObservationOperator{Nx,Ny,true}
     sens::ST
     config::CT
 end
@@ -108,7 +109,8 @@ physical_space_sensors(sens,body::Bodies.ConformalBody) = Bodies.conftransform(s
 
 # Force
 
-struct ForceObservations{Nx,Ny,CT} <: AbstractObservationOperator{Nx,Ny}
+struct ForceObservations{Nx,Ny,ST,CT} <: AbstractObservationOperator{Nx,Ny,false}
+    sens::ST
     config::CT
 end
 
@@ -118,7 +120,7 @@ end
 Constructor to create an instance of force sensing.
 """
 function ForceObservations(config::VortexConfig)
-    return ForceObservations{3*config.Nv,3,typeof(config)}(config)
+    return ForceObservations{3*config.Nv,3,Nothing,typeof(config)}(nothing,config)
 end
 
 function observations(x::AbstractVector,t,obs::ForceObservations)
