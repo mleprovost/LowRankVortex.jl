@@ -70,57 +70,7 @@ function vortexinference(ystar,xr,yr,Γr,ϵmeas,ϵX,ϵY,ϵΓ,obs::AbstractObserv
 end
 
 
-"""
-    gramians(obs,Σϵ,X,Σx) -> Matrix, Matrix
 
-Compute the state and observation gramians Cx and Cy.
-"""
-function gramians(obs::AbstractObservationOperator{Nx,Ny},Σϵ,X::EnsembleMatrix{Nx,Ne},Σx) where {Nx,Ny,Ne}
-
-    H = zeros(Float64,Ny,Nx)
-    Cx = zeros(Float64,Nx,Nx)
-    Cy = zeros(Float64,Ny,Ny)
-    invDϵ = inv(sqrt(Σϵ))
-    Dx = sqrt(Σx)
-
-    fact = min(1.0,1.0/(Ne-1)) # why isn't this just 1/Ne? it's a first-order statistic
-    #fact = min(1.0,1.0/Ne)
-
-    for j in 1:Ne
-
-        jacob!(H,X(j),obs)
-
-        H̃ = invDϵ*H*Dx
-
-        Cx .+= H̃'*H̃
-        Cy .+= H̃*H̃'
-    end
-    return fact*Cx, fact*Cy
-end
-
-"""
-    gramians_approx(obs,Σϵ,X,Σx) -> Matrix, Matrix
-
-Compute the state and observation gramians Cx and Cy using an approximation
-in which we evaluate the jacobian at the mean of the ensemble `X`.
-"""
-function gramians_approx(obs::AbstractObservationOperator{Nx,Ny},Σϵ,X::EnsembleMatrix{Nx,Ne},Σx) where {Nx,Ny,Ne}
-
-    H = zeros(Float64,Ny,Nx)
-    Cx = zeros(Float64,Nx,Nx)
-    Cy = zeros(Float64,Ny,Ny)
-    invDϵ = inv(sqrt(Σϵ))
-    Dx = sqrt(Σx)
-
-    jacob!(H,mean(X),obs)
-
-    H̃ = invDϵ*H*Dx
-
-    Cx .= H̃'*H̃
-    Cy .= H̃*H̃'
-
-    return Cx, Cy
-end
 
 
 """

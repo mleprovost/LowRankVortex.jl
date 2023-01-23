@@ -132,25 +132,25 @@ end
 
 function observations(x::AbstractVector,t,obs::SymmetricVortexPressureObservations{Nx,Ny,false}) where {Nx,Ny}
   @unpack config, sens = obs
-	return pressure(sens, state_to_lagrange(state, config), t)
+	return pressure(sens, state_to_lagrange(x, config), t)
 end
 
 function observations(x::AbstractVector,t,obs::SymmetricVortexPressureObservations{Nx,Ny,true}) where {Nx,Ny}
   @unpack config, sens = obs
 	@unpack U = config
 	freestream = Freestream(U)
-	return pressure(sens, state_to_lagrange(state, config), freestream, t)
+	return pressure(sens, state_to_lagrange(x, config), freestream, t)
 end
 
 
-function jacob!(J,x,obs::SymmetricVortexPressureObservations{Nx,Ny,false}) where {Nx,Ny}
+function jacob!(J,x::AbstractVector,t,obs::SymmetricVortexPressureObservations{Nx,Ny,false}) where {Nx,Ny}
 	@unpack sens,config,wtarget,dpd,dpdstar,Css,Cts,∂Css,Ctsblob,∂Ctsblob = obs
 
 	return symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
 														sens, vcat(state_to_lagrange(x, config)...), 1:config.Nv, t)
 end
 
-function jacob!(J,x,obs::SymmetricVortexPressureObservations{Nx,Ny,true}) where {Nx,Ny}
+function jacob!(J,x::AbstractVector,t,obs::SymmetricVortexPressureObservations{Nx,Ny,true}) where {Nx,Ny}
 	@unpack sens,config,wtarget,dpd,dpdstar,Css,Cts,∂Css,Ctsblob,∂Ctsblob = obs
 	@unpack U = config
 	freestream = Freestream(U)
@@ -207,7 +207,7 @@ function dstateobs(X, obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx
 	dXY = zeros(Nx, Ny)
 	for i in 1:Ne
 		#zi, Γi = state_to_positions_and_strengths(X(i),config)
-		xi = X[Ny+1:Ny+Nx, i]
+		xi = X(i)
 		zi = map(l->xi[3*l-2] + im*xi[3*l-1], 1:Nv)
 
 		for J in 1:Nv

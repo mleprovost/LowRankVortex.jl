@@ -11,6 +11,10 @@ export observations!, observations, AbstractObservationOperator, jacob!,
 
 abstract type AbstractObservationOperator{Nx,Ny} end
 
+measurement_length(::AbstractObservationOperator{Nx,Ny}) where {Nx,Ny} = Ny
+state_length(::AbstractObservationOperator{Nx,Ny}) where {Nx,Ny} = Nx
+
+
 """
     loglikelihood(x,ystar,Σϵ,obs) -> Float64
 
