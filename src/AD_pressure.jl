@@ -1,5 +1,6 @@
 export AD_symmetric_jacobian_pressure
 
+# DEPENDS ON STATE ARRANGEMENT
 
 """
 This routine commputes the Jacobian of the pressure field by automatic differentiation.

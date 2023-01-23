@@ -664,6 +664,7 @@ function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{In
 end
 
 
+
 # Version with allocations for regularized vortices
 function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Nv = size(source, 1)
@@ -692,6 +693,9 @@ end
 ###############################################################################################
 ##################################### BLOBS ###################################################
 ###############################################################################################
+
+# DEPENDS ON STATE ARRANGEMENT
+
 
 # In-place version for regularized vortices
 function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
@@ -976,6 +980,7 @@ end
 #     return J
 # end
 
+# DEPENDS ON STATE ARRANGEMENT
 
 # In-place version for point vortices
 function symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}

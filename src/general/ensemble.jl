@@ -103,6 +103,13 @@ mean(X::EnsembleMatrix) = _ensemble_mean(X.X,X.burnin)
 std(X::EnsembleMatrix) = _ensemble_std(X.X,X.burnin)
 cov(X::EnsembleMatrix) = _ensemble_cov(X.X,X.burnin)
 cov(X::EnsembleMatrix{Nx,Ne},Y::EnsembleMatrix{Ny,Ne}) where {Nx,Ny,Ne} = _ensemble_cov(X.X,Y.X,max(X.burnin,Y.burnin))
+
+"""
+    ensemble_perturb(X::BasicEnsembleMatrix) -> BasicEnsembleMatrix
+
+Return the perturbation of the ensemble (as another ensemble) about its own mean,
+i.e. X -> X' = X - mean(X)
+"""
 ensemble_perturb(X::EnsembleMatrix{Nx}) where {Nx} = BasicEnsembleMatrix(_ensemble_perturb(X.X,X.burnin),burnin=X.burnin)
 
 _ensemble_mean(X::AbstractMatrix,burnin) = vec(mean(X[:,burnin:end],dims=2))
@@ -155,7 +162,7 @@ end
 """
     additive_inflation!(x::AbstractVector,Σx)
 
-Add to `X` (in place) random noise drawn from a Gaussian distribution with
+Add, to state `x` (in place), random noise drawn from a Gaussian distribution with
 zero mean and variance given by `Σx`.
 """
 function additive_inflation!(x::AbstractVector,Σx::Union{UniformScaling,AbstractMatrix})

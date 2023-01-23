@@ -87,6 +87,8 @@ generate_random_states(nstates,xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConf
     [generate_random_state(xr,yr,Γr,config) for i in 1:nstates]
 
 
+# DEPENDS ON STATE ARRANGEMENT
+
 """
     lagrange_to_state_reordered(source::Vector{Element},config::VortexConfig) -> Vector{Float64}
 
@@ -108,6 +110,8 @@ function lagrange_to_state_reordered(source::Vector{T}, config::VortexConfig) wh
 
     return states
 end
+
+# DEPENDS ON STATE ARRANGEMENT
 
 function lagrange_to_state_reordered(source::Vector{T}, config::VortexConfig{Bodies.ConformalBody}) where T <: PotentialFlow.Element
     Nv = length(source)
@@ -148,6 +152,8 @@ function state_to_lagrange_reordered(state::AbstractVector{Float64}, config::Vor
     end
 end
 
+# DEPENDS ON STATE ARRANGEMENT
+
 """
     state_to_positions_and_strengths(state::AbstractVector,config::VortexConfig) -> Vector{ComplexF64}, Vector{Float64}
 
@@ -170,6 +176,8 @@ function state_to_positions_and_strengths(state::AbstractVector{Float64}, config
   return ζv, Γv
 end
 
+# DEPENDS ON STATE ARRANGEMENT
+
 function state_to_positions_and_strengths(state::AbstractVector{Float64}, config::VortexConfig)
   Nv = length(state) ÷ 3
 
@@ -178,6 +186,8 @@ function state_to_positions_and_strengths(state::AbstractVector{Float64}, config
 
   return zv, Γv
 end
+
+# DEPENDS ON STATE ARRANGEMENT
 
 function positions_and_strengths_to_state(zv::AbstractVector{ComplexF64},Γv::AbstractVector{Float64},config::VortexConfig)
   Nv = length(zv)
@@ -189,6 +199,8 @@ function positions_and_strengths_to_state(zv::AbstractVector{ComplexF64},Γv::Ab
   end
   return state
 end
+
+# DEPENDS ON STATE ARRANGEMENT
 
 function positions_and_strengths_to_state(ζv::AbstractVector{ComplexF64},Γv::AbstractVector{Float64},config::VortexConfig{Bodies.ConformalBody})
   Nv = length(ζv)

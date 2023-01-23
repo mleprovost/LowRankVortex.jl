@@ -736,6 +736,8 @@ end
 ##################################### BLOBS ###################################################
 ###############################################################################################
 
+# DEPENDS ON STATE ARRANGEMENT
+
 # In-place version for regularized vortices
 function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source::T,
 	                                             freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}

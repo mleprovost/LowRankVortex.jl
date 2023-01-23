@@ -545,6 +545,7 @@ function analytical_jacobian_pressure(target, source::T, freestream, idx::Union{
 end
 
 
+# DEPENDS ON STATE ARRANGEMENT
 
 # In-place version for point vortices
 function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
@@ -620,6 +621,7 @@ function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, targe
 	return J
 end
 
+# DEPENDS ON STATE ARRANGEMENT
 
 # In-place version for regularized vortices
 function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}

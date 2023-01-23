@@ -12,6 +12,7 @@ analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Ve
 analytical_force_jacobian!(J, source::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where T <: PotentialFlow.Element =
 			analytical_force_jacobian!(J,source,config.body;kwargs...)
 
+# DEPENDS ON STATE ARRANGEMENT
 
 function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, b::Bodies.ConformalBody; kwargs...) where T <: PotentialFlow.Element
 	Nv = length(source)
@@ -39,6 +40,7 @@ function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, s
 	return J
 end
 
+# DEPENDS ON STATE ARRANGEMENT
 
 function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}; kwargs...) where T <: PotentialFlow.Element
 	Nv = length(source)
@@ -65,6 +67,7 @@ end
 analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, ::Nothing; kwargs...) where T <: PotentialFlow.Element =
 		analytical_pressure_jacobian!(J,target,source;kwargs...)
 
+# DEPENDS ON STATE ARRANGEMENT
 
 function analytical_force_jacobian!(J,source::Vector{T}, b::Bodies.ConformalBody; kwargs...) where T <: PotentialFlow.Element
 	Nv = length(source)
