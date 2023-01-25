@@ -44,14 +44,6 @@ include("general/api.jl")
 include("general/classification.jl")
 
 
-
-
-# Point vortices about a circular cylinder
-include("cylinder/cylindervortex.jl")
-include("cylinder/forecast.jl")
-#include("cylinder/cylinder_pressure.jl")
-
-
 include("plot_recipes.jl")
 
 
