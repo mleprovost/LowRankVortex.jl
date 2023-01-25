@@ -2,7 +2,7 @@ using Test
 
 using LinearAlgebra, Statistics
 using LowRankVortex
-using TransportBasedInference
+#using TransportBasedInference
 using ForwardDiff
 using PotentialFlow
 import PotentialFlow.Plates: Plate, Points, Blobs

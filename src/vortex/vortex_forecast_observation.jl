@@ -29,7 +29,7 @@ function forecast(x::AbstractVector,t,Δt,fdata::VortexForecast{Nx,withfreestrea
 	@unpack U, advect_flag = config
 
 	freestream = Freestream(U)
-	source = state_to_lagrange(col, config)
+	source = state_to_lagrange(x, config)
 
 	# Compute the induced velocity (by exploiting the symmetry of the problem)
 	reset_velocity!(cachevels, source)

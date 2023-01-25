@@ -4,8 +4,6 @@ using Statistics
 
     atol = 1000*eps()
 
-    sensors = -11.0:0.5:10.0
-
     Nv = 10
     Nx = 3*Nv
     U = randn(ComplexF64)
@@ -15,11 +13,8 @@ using Statistics
 
     config = let Nv = Nv,
                  U = U,
-                 ss = sensors, Δt = 5e-3, δ = 1e-1,
-                 ϵX = 1e-3, ϵΓ = 1e-3,
-                 β = 1.0,
-                 ϵY = 1e-2
-        VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+                 Δt = 5e-3, δ = 1e-1
+        VortexConfig(Nv, U, Δt, δ,body=LowRankVortex.OldFlatWall)
     end
 
     blobs = state_to_lagrange(x0, config)
@@ -42,8 +37,6 @@ end
 
     atol = 1000*eps()
 
-    sensors = complex.(-11.0:0.5:10.0)
-
     Nv = 10
     Nx = 3*Nv
     U = randn(ComplexF64)
@@ -51,16 +44,13 @@ end
 
     config = let Nv = Nv,
                  U = U,
-                 ss = sensors, Δt = 5e-3, δ = 1e-1,
-                 ϵX = 1e-3, ϵΓ = 1e-3,
-                 β = 1.0,
-                 ϵY = 1e-2
-        VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+                 Δt = 5e-3, δ = 1e-1
+        VortexConfig(Nv, U, Δt, δ)
     end
 
     blobs0 = create_random_vortices(Nv; σ = config.δ)
-    xblobs = cylinder_lagrange_to_state(blobs0, config)
-    blobs = cylinder_state_to_lagrange(xblobs, config)
+    xblobs = lagrange_to_state(blobs0, config)
+    blobs = state_to_lagrange(xblobs, config)
 
     for i=1:config.Nv
         @test isapprox(blobs0[i].z, xblobs[3*i-2] + im*xblobs[3*i-1], atol = atol)
@@ -100,13 +90,13 @@ end
   Γv = -Γ0 .+ 2*Γ0*rand(Nv)
   vort = Vortex.Blob.(zv,Γv,δ)
 
-  x = lagrange_to_state_reordered(vort,config_data)
+  x = lagrange_to_state(vort,config_data)
   @test x[1] == real(vort[1].z) && x[2] == imag(vort[1].z)
-  @test x[3] == real(vort[2].z) && x[4] == imag(vort[2].z)
-  @test x[2Nv+1] == vort[1].S
-  @test x[2Nv+2] == vort[2].S
+  @test x[4] == real(vort[2].z) && x[5] == imag(vort[2].z)
+  @test x[3] == vort[1].S
+  @test x[6] == vort[2].S
 
-  vort_2 = state_to_lagrange_reordered(x,config_data)
+  vort_2 = state_to_lagrange(x,config_data)
   @test Elements.position(vort_2) ≈ Elements.position(vort)
   @test LowRankVortex.strength(vort_2) ≈ LowRankVortex.strength(vort)
 
@@ -118,13 +108,13 @@ end
   zv = LowRankVortex.random_points_unit_circle(Nv,(1.05,1.4),(0,2π))
   vort = Vortex.Blob.(zv,Γv,δ)
 
-  x = lagrange_to_state_reordered(vort,config_data)
-  @test x[1] == log(abs(vort[1].z)-1.0) && x[Nv+1] == angle(vort[1].z)*abs(vort[1].z)
-  @test x[2] == log(abs(vort[2].z)-1.0) && x[Nv+2] == angle(vort[2].z)*abs(vort[2].z)
-  @test x[2Nv+1] == vort[1].S
-  @test x[2Nv+2] == vort[2].S
+  x = lagrange_to_state(vort,config_data)
+  @test x[1] == log(abs(vort[1].z)-1.0) && x[2] == angle(vort[1].z)*abs(vort[1].z)
+  @test x[4] == log(abs(vort[2].z)-1.0) && x[5] == angle(vort[2].z)*abs(vort[2].z)
+  @test x[3] == vort[1].S
+  @test x[6] == vort[2].S
 
-  vort_2 = state_to_lagrange_reordered(x,config_data)
+  vort_2 = state_to_lagrange(x,config_data)
   @test Elements.position(vort_2) ≈ Elements.position(vort)
   @test LowRankVortex.strength(vort_2) ≈ LowRankVortex.strength(vort)
 

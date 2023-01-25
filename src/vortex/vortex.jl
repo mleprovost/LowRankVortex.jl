@@ -202,7 +202,7 @@ function lagrange_to_state(source::Vector{T}, config::VortexConfig{Body}) where 
         zi = Elements.position(bi)
         ri, Θi = abs(zi), angle(zi)
         states[logr_ids[i]] = log(ri-1.0)
-        states[rΘ_ids[i]] = ri*Θi
+        states[rϴ_ids[i]] = ri*Θi
         states[Γ_ids[i]] =  strength(bi)
     end
 
