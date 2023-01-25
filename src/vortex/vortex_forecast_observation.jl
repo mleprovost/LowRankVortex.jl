@@ -1,6 +1,7 @@
 ### Forecasting, observation, filtering, and localization operators for vortex problems ####
 
-export VortexForecast, SymmetricVortexForecast, SymmetricVortexPressureObservations,
+export VortexForecast, SymmetricVortexForecast, VortexPressureObservations,
+					SymmetricVortexPressureObservations,
 					PressureObservations, ForceObservations, physical_space_sensors
 
 #import TransportBasedInference: Parallel, Serial, Thread # These should not be necessary
@@ -166,14 +167,14 @@ end
 
 function observations(x::AbstractVector,t,obs::SymmetricVortexPressureObservations{Nx,Ny,false}) where {Nx,Ny}
   @unpack config, sens = obs
-	return pressure(sens, state_to_lagrange(x, config), t)
+	return symmetric_pressure(real(sens), state_to_lagrange(x, config), t)
 end
 
 function observations(x::AbstractVector,t,obs::SymmetricVortexPressureObservations{Nx,Ny,true}) where {Nx,Ny}
   @unpack config, sens = obs
 	@unpack U = config
 	freestream = Freestream(U)
-	return pressure(sens, state_to_lagrange(x, config), freestream, t)
+	return symmetric_pressure(real(sens), state_to_lagrange(x, config), freestream, t)
 end
 
 
@@ -192,6 +193,71 @@ function jacob!(J,x::AbstractVector,t,obs::SymmetricVortexPressureObservations{N
 										sens, vcat(state_to_lagrange(x, config)...), freestream, 1:config.Nv, config.state_id, t)
 end
 
+
+struct VortexPressureObservations{Nx,Ny,withfreestream,ST} <: AbstractCartesianVortexObservations{Nx,Ny}
+    sens::ST
+    config::VortexConfig
+		wtarget :: Vector{ComplexF64}
+		dpd :: Matrix{ComplexF64}
+		dpdstar :: Matrix{ComplexF64}
+		Css :: Matrix{ComplexF64}
+		Cts :: Matrix{ComplexF64}
+		∂Css :: Matrix{Float64}
+		Ctsblob :: Matrix{ComplexF64}
+		∂Ctsblob :: Matrix{Float64}
+end
+
+function VortexPressureObservations(sens::AbstractVector,config::VortexConfig)
+	withfreestream = config.U == 0.0 ? false : true
+
+	Nv = config.Nv
+	Nx = 3*Nv
+	Ny = length(sens)
+
+	wtarget = zeros(ComplexF64, Ny)
+	dpd = zeros(ComplexF64, Ny, 2*Nv)
+	dpdstar = zeros(ComplexF64, Ny, 2*Nv)
+
+	Css = zeros(ComplexF64, 2*Nv, 2*Nv)
+	Cts = zeros(ComplexF64, Ny, 2*Nv)
+
+	∂Css = zeros(2*Nv, 2*Nv)
+	Ctsblob = zeros(ComplexF64, Ny, 2*Nv)
+	∂Ctsblob = zeros(Ny, 2*Nv)
+
+	return VortexPressureObservations{Nx,length(sens),withfreestream,typeof(sens)}(sens,config,wtarget,dpd,dpdstar,Css,Cts,∂Css,Ctsblob,∂Ctsblob)
+end
+
+function observations(x::AbstractVector,t,obs::VortexPressureObservations{Nx,Ny,false}) where {Nx,Ny}
+  @unpack config, sens = obs
+	return pressure(sens, state_to_lagrange(x, config), t)
+end
+
+function observations(x::AbstractVector,t,obs::VortexPressureObservations{Nx,Ny,true}) where {Nx,Ny}
+  @unpack config, sens = obs
+	@unpack U = config
+	freestream = Freestream(U)
+	return pressure(sens, state_to_lagrange(x, config), freestream, t)
+end
+
+
+function jacob!(J,x::AbstractVector,t,obs::VortexPressureObservations{Nx,Ny,false}) where {Nx,Ny}
+	@unpack sens,config,wtarget,dpd,dpdstar,Css,Cts,∂Css,Ctsblob,∂Ctsblob = obs
+
+	return analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
+														sens, vcat(state_to_lagrange(x, config)...), 1:config.Nv, config.state_id, t)
+end
+
+function jacob!(J,x::AbstractVector,t,obs::VortexPressureObservations{Nx,Ny,true}) where {Nx,Ny}
+	@unpack sens,config,wtarget,dpd,dpdstar,Css,Cts,∂Css,Ctsblob,∂Ctsblob = obs
+	@unpack U = config
+	freestream = Freestream(U)
+	return analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
+										sens, vcat(state_to_lagrange(x, config)...), freestream, 1:config.Nv, config.state_id, t)
+end
+
+
+#### END OF LEGACY PRESSURE OBSERVATION OPS #####
 
 # Pressure
 
@@ -214,13 +280,13 @@ end
 
 function observations(x::AbstractVector,t,obs::PressureObservations)
   @unpack config, sens = obs
-  v = state_to_lagrange_reordered(x,config)
+  v = state_to_lagrange(x,config)
   return _pressure(sens,v,config)
 end
 
 function jacob!(J,x::AbstractVector,t,obs::PressureObservations)
     @unpack config, sens = obs
-    v = state_to_lagrange_reordered(x,config)
+    v = state_to_lagrange(x,config)
     return _pressure_jacobian!(J,sens,v,config)
 end
 
@@ -256,13 +322,13 @@ end
 
 function observations(x::AbstractVector,t,obs::ForceObservations)
   @unpack config = obs
-  v = state_to_lagrange_reordered(x,config)
+  v = state_to_lagrange(x,config)
   return analytical_force(v,config)
 end
 
 function jacob!(J,x::AbstractVector,t,obs::ForceObservations)
     @unpack config = obs
-    v = state_to_lagrange_reordered(x,config)
+    v = state_to_lagrange(x,config)
     analytical_force_jacobian!(J,v,config)
 end
 

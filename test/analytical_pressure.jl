@@ -158,13 +158,13 @@ end
 	p2 = analytical_pressure(sens,vort)
 	@test p == p2
 
-	x = lagrange_to_state_reordered(vort,config_data)
+	x = lagrange_to_state(vort,config_data)
 
 	H = zeros(Float64,length(sens),length(x))
 	analytical_pressure_jacobian!(H,sens,vort,config_data)
 
 	H2 = zeros(Float64,length(sens),length(x))
-	analytical_pressure_jacobian!(H2,sens,vort)
+	analytical_pressure_jacobian!(H2,sens,vort,config_data.state_id)
 
 	@test H == H2
 
@@ -185,13 +185,13 @@ end
 
 	@test p == p2
 
-	x = lagrange_to_state_reordered(vort,config_data)
+	x = lagrange_to_state(vort,config_data)
 
 	H = zeros(Float64,length(sens),length(x))
 	analytical_pressure_jacobian!(H,sens,vort,config_data)
 
 	H2 = zeros(Float64,length(sens),length(x))
-	analytical_pressure_jacobian!(H2,sens,vort,b)
+	analytical_pressure_jacobian!(H2,sens,vort,b,config_data.state_id)
 
 	@test H == H2
 

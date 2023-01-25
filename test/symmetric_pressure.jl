@@ -113,19 +113,28 @@ end
 
     config = let Nv = Nv,
          U = U,
-         ss = sensors, Δt = 1e-3, δ = 5e-2,
-         ϵX = 1e-3, ϵΓ = 1e-4,
-         β = 1.0,
-         ϵY = 1e-16
-         VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+         Δt = 1e-3, δ = 5e-2
+         VortexConfig(Nv, U, Δt, δ; body=LowRankVortex.OldFlatWall)
+    end
+
+    config_symm = let Nv = Nv,
+         U = U,
+         Δt = 1e-3, δ = 5e-2
+         VortexConfig(Nv, U, Δt, δ)
     end
 
     sys = state_to_lagrange(x, config)
+
+
+    odata_symm = SymmetricVortexPressureObservations(sensors,config_symm)
+    odata = VortexPressureObservations(sensors,config)
+
+
     press_truth = pressure(sensors, sys, 0.0)
 
-    press = measure_state(x, 0.0, config)
+    press = observations(x,0.0,odata)
 
-    press_symmetric = measure_state_symmetric(x, 0.0, config)
+    press_symmetric = observations(x,0.0,odata_symm)
 
     @test isapprox(press, press_truth, atol = atol)
     @test isapprox(press_symmetric, press_truth, atol = atol)
@@ -147,20 +156,29 @@ end
 
     config = let Nv = Nv,
          U = U,
-         ss = sensors, Δt = 1e-3, δ = 5e-2,
-         ϵX = 1e-3, ϵΓ = 1e-4,
-         β = 1.0,
-         ϵY = 1e-16
-         VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+         Δt = 1e-3, δ = 5e-2
+         VortexConfig(Nv, U, Δt, δ; body=LowRankVortex.OldFlatWall)
+    end
+
+    config_symm = let Nv = Nv,
+         U = U,
+         Δt = 1e-3, δ = 5e-2
+         VortexConfig(Nv, U, Δt, δ)
     end
 
     sys = state_to_lagrange(x, config)
 
-    press_symmetric = measure_state_symmetric(x, 0.0, config; withfreestream = true)
-    press_sym = symmetric_pressure(real.(sensors), sys[1], freestream, 0.0)
+    odata_symm = SymmetricVortexPressureObservations(sensors,config_symm)
+    odata = VortexPressureObservations(sensors,config)
+
+
     press_truth = pressure(sensors, sys, freestream, 0.0)
+
+    press = observations(x,0.0,odata)
+
+    press_symmetric = observations(x,0.0,odata_symm)
 
 
     @test isapprox(press_symmetric, press_truth, atol = atol)
-    @test isapprox(press_sym, press_truth, atol = atol)
+    @test isapprox(press, press_truth, atol = atol)
 end

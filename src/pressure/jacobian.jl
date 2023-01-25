@@ -27,7 +27,7 @@ function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, s
 		dpdζi = analytical_dpdζv(target, i, source, b; kwargs...)
 		ζi = Elements.position(source[i])
 		J[:,logr_ids[i]] .= 2*(abs(ζi)-1.0)*real.(dpdζi*ζi/abs(ζi))
-		J[:,rΘ_ids[i]] .= -2*imag.(dpdζi*ζi/abs(ζi))
+		J[:,rϴ_ids[i]] .= -2*imag.(dpdζi*ζi/abs(ζi))
 
 		dpdΓi = analytical_dpdΓv(target, i, source, b; kwargs...)
 		J[:,Γ_ids[i]] .= dpdΓi

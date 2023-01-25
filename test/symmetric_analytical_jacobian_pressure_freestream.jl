@@ -21,11 +21,14 @@
 
     config = let Nv = Nv,
              U = U,
-             ss = sensors, Δt = 1e-3, δ = 5e-2,
-             ϵX = 1e-3, ϵΓ = 1e-4,
-             β = 1.0,
-             ϵY = 1e-16
-            VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+             Δt = 1e-3, δ = 5e-2
+            VortexConfig(Nv, U, Δt, δ; body=LowRankVortex.OldFlatWall)
+    end
+
+    config_symm = let Nv = Nv,
+             U = U,
+             Δt = 1e-3, δ = 5e-2
+            VortexConfig(Nv, U, Δt, δ)
     end
 
     sys = state_to_lagrange(x, config; isblob = false)
@@ -63,11 +66,8 @@ end
 
     config = let Nv = Nv,
              U = U,
-             ss = sensors, Δt = 1e-3, δ = 5e-2,
-             ϵX = 1e-3, ϵΓ = 1e-4,
-             β = 1.0,
-             ϵY = 1e-16
-            VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+             Δt = 1e-3, δ = 5e-2
+            VortexConfig(Nv, U, Δt, δ; body=LowRankVortex.OldFlatWall)
     end
 
     sys = state_to_lagrange(x, config; isblob = true)
@@ -104,11 +104,8 @@ end
 
     config = let Nv = Nv,
              U = U,
-             ss = sensors, Δt = 1e-3, δ = 5e-2,
-             ϵX = 1e-3, ϵΓ = 1e-4,
-             β = 1.0,
-             ϵY = 1e-16
-            VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+             Δt = 1e-3, δ = 5e-2
+            VortexConfig(Nv, U, Δt, δ; body=LowRankVortex.OldFlatWall)
     end
 
     sys = state_to_lagrange(x, config; isblob = false)
@@ -143,11 +140,8 @@ end
 
     config = let Nv = Nv,
              U = U,
-             ss = sensors, Δt = 1e-3, δ = 5e-2,
-             ϵX = 1e-3, ϵΓ = 1e-4,
-             β = 1.0,
-             ϵY = 1e-16
-            VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+             Δt = 1e-3, δ = 5e-2
+            VortexConfig(Nv, U, Δt, δ; body=LowRankVortex.OldFlatWall)
     end
 
     sys = state_to_lagrange(x, config; isblob = true)
@@ -181,11 +175,8 @@ end
 
     config = let Nv = Nv,
              U = U,
-             ss = sensors, Δt = 1e-3, δ = 5e-2,
-             ϵX = 1e-3, ϵΓ = 1e-4,
-             β = 1.0,
-             ϵY = 1e-16
-            VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+             Δt = 1e-3, δ = 5e-2
+            VortexConfig(Nv, U, Δt, δ; body=LowRankVortex.OldFlatWall)
     end
 
     sys = state_to_lagrange(x, config; isblob = true)
@@ -200,8 +191,8 @@ end
 
     # Test only on a subset of the vortices
 
-    J = analytical_jacobian_pressure(sensors, sys, freestream, 1:Nv, 0.0)
-    Jsym = symmetric_analytical_jacobian_pressure(xsensors, sys, freestream, 1:Nv, 0.0)
+    J = analytical_jacobian_pressure(sensors, sys, freestream, 1:Nv, config.state_id, 0.0)
+    Jsym = symmetric_analytical_jacobian_pressure(xsensors, sys, freestream, 1:Nv, config.state_id, 0.0)
 
     @test isapprox(J[:,1:3*Nv], Jfull[:,1:3*Nv], atol = atol)
     @test isapprox(Jsym[:,1:3*Nv], Jfull[:,1:3*Nv], atol = atol)

@@ -707,7 +707,7 @@ end
 
 
 # Version with allocations for regularized vortices
-function symmetric_analytical_jacobian_pressure(target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}},
+function symmetric_analytical_jacobian_pressure(target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}},state_id::Dict,
 	                                            t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Nv = size(source, 1)
 	Nx = 3*Nv
@@ -727,7 +727,7 @@ function symmetric_analytical_jacobian_pressure(target, source::T, freestream, i
 	Ctsblob = zeros(ComplexF64, Ny, Nv)
 	∂Ctsblob = zeros(Ny, Nv)
 
-	symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source, freestream, idx, t)
+	symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source, freestream, idx, state_id, t)
 	return J
 end
 
