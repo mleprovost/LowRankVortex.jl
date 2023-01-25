@@ -1,6 +1,6 @@
 export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_state_mapping,
           state_to_positions_and_strengths, positions_and_strengths_to_state,
-          state_to_vortex_states, states_to_vortex_states
+          state_to_vortex_states, states_to_vortex_states, state_covariance
 
 
 abstract type ImageType end
@@ -282,6 +282,25 @@ function positions_and_strengths_to_state(ζv::AbstractVector{ComplexF64},Γv::A
   end
   return state
 end
+
+function state_covariance(varx, vary, varΓ, config::VortexConfig)
+  @unpack Nv, state_id = config
+
+  x_ids = state_id["vortex x"]
+  y_ids = state_id["vortex y"]
+  Γ_ids = state_id["vortex Γ"]
+
+  Σx_diag = zeros(Float64,state_length(config))
+  for j = 1:Nv
+    Σx_diag[x_ids[j]] = varx
+    Σx_diag[y_ids[j]] = vary
+    Σx_diag[Γ_ids[j]] = varΓ
+  end
+  return Diagonal(Σx_diag)
+end
+
+### OTHER WAYS OF DECOMPOSING STATES ###
+
 
 """
     states_to_vortex_states(state_array::Matrix,config::VortexConfig)

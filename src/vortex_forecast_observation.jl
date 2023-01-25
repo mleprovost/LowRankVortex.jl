@@ -92,6 +92,41 @@ function forecast(x::AbstractVector,t,Δt,fdata::SymmetricVortexForecast{Nx,with
 
 end
 
+struct CylinderVortexForecast{Nx,CVT} <: AbstractForecastOperator{Nx}
+		config :: VortexConfig
+		cachevels :: CVT
+end
+
+"""
+		CylinderVortexForecast(config::VortexConfig)
+
+Allocate the structure for forecasting of vortex dynamics about a cylinder.
+"""
+function CylinderVortexForecast(config::VortexConfig)
+	Nx = 3*config.Nv
+	cachevels = allocate_velocity(state_to_lagrange(zeros(Nx), config))
+	CylinderVortexForecast{Nx,typeof(cachevels)}(config,cachevels)
+end
+
+function forecast(x::AbstractVector,t,Δt,fdata::CylinderVortexForecast{Nx}) where {Nx}
+	@unpack config, cachevels = fdata
+	@unpack advect_flag, Δt = config
+
+	source = state_to_lagrange(x, config)
+
+	reset_velocity!(cachevels, source)
+	cachevels .= conj.(LowRankVortex.w(Elements.position(source),source; ϵ = config.δ))
+
+	# Advect the system
+	if advect_flag
+		advect!(source, source, cachevels, Δt)
+	end
+
+	return lagrange_to_state(source, config)
+
+end
+
+
 abstract type AbstractCartesianVortexObservations{Nx,Ny} <: AbstractObservationOperator{Nx,Ny,true} end
 
 # This one is meant to replace the legacy pressure functions
