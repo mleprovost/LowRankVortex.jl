@@ -1,95 +1,89 @@
 export analytical_pressure_jacobian!, analytical_force_jacobian!
 
-analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where T <: PotentialFlow.Element =
-			analytical_pressure_jacobian!(J,target,source,config.body;kwargs...)
+analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T},config::VortexConfig{Body};kwargs...) where T <: PotentialFlow.Element =
+			analytical_pressure_jacobian!(J,target,source,config.body,config.state_id;kwargs...)
 
-analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64},source::Vector{T},config::VortexConfig{DataType}) where {T <: PotentialFlow.Element} =
-    analytical_pressure_jacobian!(J,target,source;ϵ=config.δ,walltype=config.body)
+analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64},source::Vector{T},config::VortexConfig{WT}) where {T <: PotentialFlow.Element, WT <: ImageType} =
+    analytical_pressure_jacobian!(J,target,source,config.state_id;ϵ=config.δ,walltype=config.body)
 
 analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T},config::VortexConfig;kwargs...) where T <: PotentialFlow.Element =
-			analytical_pressure_jacobian!(J,target,source;kwargs...)
+			analytical_pressure_jacobian!(J,target,source,config.state_id;kwargs...)
 
-analytical_force_jacobian!(J, source::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where T <: PotentialFlow.Element =
-			analytical_force_jacobian!(J,source,config.body;kwargs...)
+analytical_force_jacobian!(J, source::Vector{T},config::VortexConfig{Body};kwargs...) where T <: PotentialFlow.Element =
+			analytical_force_jacobian!(J,source,config.body,config.state_id;kwargs...)
 
-# DEPENDS ON STATE ARRANGEMENT
-
-function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, b::Bodies.ConformalBody; kwargs...) where T <: PotentialFlow.Element
+function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, b::Bodies.ConformalBody, state_id::Dict; kwargs...) where T <: PotentialFlow.Element
 	Nv = length(source)
-	Nx = 3*Nv
+	Nx = state_length(state_id)
 	Ny = size(target, 1)
   #J = zeros(Float64,Ny,Nx)
   @assert size(J) == (Ny, Nx)
 
-	# dpdzi = zeros(ComplexF64, Ny)
-	# dpdΓi = zeros(Ny)
+	logr_ids = state_id["vortex logr"]
+  rϴ_ids = state_id["vortex rΘ"]
+  Γ_ids = state_id["vortex Γ"]
 
 	for i=1:Nv
-		#dpdzi = analytical_dpdzv(target, i, source, b; kwargs...)
-		#J[:,2*i-1] .= 2*real.(dpdzi)
-		#J[:,2*i] .= -2*imag.(dpdzi)
 		dpdζi = analytical_dpdζv(target, i, source, b; kwargs...)
 		ζi = Elements.position(source[i])
-		J[:,i] .= 2*(abs(ζi)-1.0)*real.(dpdζi*ζi/abs(ζi))
-		J[:,Nv+i] .= -2*imag.(dpdζi*ζi/abs(ζi))
+		J[:,logr_ids[i]] .= 2*(abs(ζi)-1.0)*real.(dpdζi*ζi/abs(ζi))
+		J[:,rΘ_ids[i]] .= -2*imag.(dpdζi*ζi/abs(ζi))
 
 		dpdΓi = analytical_dpdΓv(target, i, source, b; kwargs...)
-		J[:,2*Nv+i] .= dpdΓi
+		J[:,Γ_ids[i]] .= dpdΓi
 	end
 
 	return J
 end
 
-# DEPENDS ON STATE ARRANGEMENT
-
-function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}; kwargs...) where T <: PotentialFlow.Element
+function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, state_id::Dict; kwargs...) where T <: PotentialFlow.Element
 	Nv = length(source)
-	Nx = 3*Nv
+	Nx = state_length(state_id)
 	Ny = size(target, 1)
   #J = zeros(Float64,Ny,Nx)
   @assert size(J) == (Ny, Nx)
+
+	x_ids = state_id["vortex x"]
+  y_ids = state_id["vortex y"]
+  Γ_ids = state_id["vortex Γ"]
 
 	# dpdzi = zeros(ComplexF64, Ny)
 	# dpdΓi = zeros(Ny)
 
 	for i=1:Nv
 		dpdzi = analytical_dpdzv(target, i, source; kwargs...)
-		J[:,2*i-1] .= 2*real.(dpdzi)
-		J[:,2*i] .= -2*imag.(dpdzi)
+		J[:,x_ids[i]] .= 2*real.(dpdzi)
+		J[:,y_ids[i]] .= -2*imag.(dpdzi)
 
 		dpdΓi = analytical_dpdΓv(target, i, source; kwargs...)
-		J[:,2*Nv+i] .= dpdΓi
+		J[:,Γ_ids[i]] .= dpdΓi
 	end
 
 	return J
 end
 
-analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, ::Nothing; kwargs...) where T <: PotentialFlow.Element =
-		analytical_pressure_jacobian!(J,target,source;kwargs...)
+analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, ::Nothing, state_id; kwargs...) where T <: PotentialFlow.Element =
+		analytical_pressure_jacobian!(J,target,source,state_id;kwargs...)
 
-# DEPENDS ON STATE ARRANGEMENT
-
-function analytical_force_jacobian!(J,source::Vector{T}, b::Bodies.ConformalBody; kwargs...) where T <: PotentialFlow.Element
+function analytical_force_jacobian!(J,source::Vector{T}, b::Bodies.ConformalBody, state_id::Dict; kwargs...) where T <: PotentialFlow.Element
 	Nv = length(source)
-	Nx = 3*Nv
+	Nx = state_length(state_id)
 	Ny = 3
   #J = zeros(Float64,Ny,Nx)
   @assert size(J) == (Ny, Nx)
 
-	# dpdzi = zeros(ComplexF64, Ny)
-	# dpdΓi = zeros(Ny)
+	logr_ids = state_id["vortex logr"]
+  rϴ_ids = state_id["vortex rΘ"]
+  Γ_ids = state_id["vortex Γ"]
 
 	for i=1:Nv
-		#dpdzi = analytical_dpdzv(target, i, source, b; kwargs...)
-		#J[:,2*i-1] .= 2*real.(dpdzi)
-		#J[:,2*i] .= -2*imag.(dpdzi)
 		dfdζi = analytical_dfdζv(i, source, b; kwargs...)
 		ζi = Elements.position(source[i])
-		J[:,i] .= 2*(abs(ζi)-1.0)*real.(dfdζi*ζi/abs(ζi))
-		J[:,Nv+i] .= -2*imag.(dfdζi*ζi/abs(ζi))
+		J[:,logr_ids[i]] .= 2*(abs(ζi)-1.0)*real.(dfdζi*ζi/abs(ζi))
+		J[:,rϴ_ids[i]] .= -2*imag.(dfdζi*ζi/abs(ζi))
 
 		dfdΓi = analytical_dfdΓv(i, source, b; kwargs...)
-		J[:,2*Nv+i] .= dfdΓi
+		J[:,Γ_ids[i]] .= dfdΓi
 	end
 
 	return J

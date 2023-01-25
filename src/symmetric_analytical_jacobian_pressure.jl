@@ -641,12 +641,12 @@ function symmetric_analytical_jacobian_strength(target::Vector{Float64}, source,
 end
 
 
-symmetric_analytical_jacobian_pressure(target, source, t) = symmetric_analytical_jacobian_pressure(target, source, 1:length(source), t)
+symmetric_analytical_jacobian_pressure(target, source, t) = symmetric_analytical_jacobian_pressure(target, source, 1:length(source), construct_state_mapping(length(source)), t)
 
 # Version with allocations for point vortices
-function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
+function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, state_id::Dict, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 	Nv = size(source, 1)
-	Nx = 3*Nv
+	Nx = state_length(state_id)
 	Ny = size(target, 1)
 
 	J = zeros(Ny, Nx)
@@ -659,16 +659,16 @@ function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{In
 	Css = zeros(ComplexF64, Nv, Nv)
 	Cts = zeros(ComplexF64, Ny, Nv)
 
-	symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source, idx, t)
+	symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source, idx, state_id, t)
 	return J
 end
 
 
 
 # Version with allocations for regularized vortices
-function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
+function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, state_id::Dict, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Nv = size(source, 1)
-	Nx = 3*Nv
+	Nx = state_length(state_id)
 	Ny = size(target, 1)
 
 	J = zeros(Ny, Nx)
@@ -685,7 +685,7 @@ function symmetric_analytical_jacobian_pressure(target, source::T, idx::Union{In
 	Ctsblob = zeros(ComplexF64, Ny, Nv)
 	∂Ctsblob = zeros(Ny, Nv)
 
-	symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source, idx, t)
+	symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source, idx, state_id, t)
 	return J
 end
 
@@ -694,15 +694,16 @@ end
 ##################################### BLOBS ###################################################
 ###############################################################################################
 
-# DEPENDS ON STATE ARRANGEMENT
-
-
 # In-place version for regularized vortices
-function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
+function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, state_id::Dict, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Ny = size(target, 1)
 	Nx = size(source, 1)
 	@assert mod(Nx, 2) == 0
 	halfNx = Nx÷2
+
+  x_ids = state_id["vortex x"]
+  y_ids = state_id["vortex y"]
+  Γ_ids = state_id["vortex Γ"]
 
 	δ = source[1].δ
 
@@ -891,13 +892,12 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Ct
 	@inbounds dpdS[:,idx] .+= -0.5*cst*(wtarget .* Ctsblob[:,idx])
 
 	@inbounds for L in idx
-		J[:, 3*(L-1)+1] .= 2*real.(view(dpdz,:,L))
-		J[:, 3*(L-1)+2] .= -2*imag.(view(dpdz,:,L))
-		J[:, 3*(L-1)+3] .=  2*imag.(view(dpdS,:,L))
+		J[:, x_ids[L]] .= 2*real.(view(dpdz,:,L))
+		J[:, y_ids[L]] .= -2*imag.(view(dpdz,:,L))
+		J[:, Γ_ids[L]] .=  2*imag.(view(dpdS,:,L))
 	end
 
 	return J
-	# J[:, 1:3:3*(Nv-1)+1] .= 2*real.(dpd[:,1:Nv])
 
 end
 
@@ -980,12 +980,10 @@ end
 #     return J
 # end
 
-# DEPENDS ON STATE ARRANGEMENT
-
 # In-place version for point vortices
-function symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
+function symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source::T, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, state_id::Dict, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 	Nv = size(source, 1)
-	Nx = 3*Nv
+	Nx = state_length(state_id)
 	Ny = size(target, 1)
 
 	@assert size(J) == (Ny, Nx)
@@ -994,6 +992,10 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, 
 	@assert size(dpdstar) == (Ny, Nv)
 	@assert size(Css) == (Nv, Nv)
 	@assert size(Cts) == (Ny, Nv)
+
+  x_ids = state_id["vortex x"]
+	y_ids = state_id["vortex y"]
+	Γ_ids = state_id["vortex Γ"]
 
 	fill!(J, 0.0)# Construct the Cauchy matrix to store 1/(zJ-zK) in Css
 	@inbounds for K=1:Nv
@@ -1061,14 +1063,14 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, 
 								  iscauchystored = true)
 
 	# Fill dpdpx and dpdy
-	J[:, 1:3:3*(Nv-1)+1] .= 2*real.(dpd[:,1:Nv])
-	J[:, 2:3:3*(Nv-1)+2] .= -2*imag.(dpd[:,1:Nv])
+	J[:, x_ids] .= 2*real.(dpd[:,1:Nv])
+	J[:, y_ids] .= -2*imag.(dpd[:,1:Nv])
 
 	symmetric_analytical_jacobian_strength!(dpd, dpdstar, Css, Cts, wtarget, target, src, idx, t;
 								  iscauchystored = true)
 
 	# Vortices
-	J[:, 3:3:3*(Nv-1)+3] .= 2imag.(dpd[:,1:Nv])
+	J[:, Γ_ids] .= 2imag.(dpd[:,1:Nv])
 
 	return J
 end

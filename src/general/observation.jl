@@ -93,16 +93,16 @@ function jacob!(J,x::AbstractVector,t,obs::PressureObservations)
     return _pressure_jacobian!(J,sens,v,config)
 end
 
-_pressure(sens,v,config::VortexConfig{Bodies.ConformalBody}) = analytical_pressure(sens,v,config;preserve_circ=false)
+_pressure(sens,v,config::VortexConfig{Body}) = analytical_pressure(sens,v,config;preserve_circ=false)
 _pressure(sens,v,config::VortexConfig) = analytical_pressure(sens,v,config)
 
-_pressure_jacobian!(J,sens,v,config::VortexConfig{Bodies.ConformalBody}) = analytical_pressure_jacobian!(J,sens,v,config;preserve_circ=false)
+_pressure_jacobian!(J,sens,v,config::VortexConfig{Body}) = analytical_pressure_jacobian!(J,sens,v,config;preserve_circ=false)
 _pressure_jacobian!(J,sens,v,config::VortexConfig) = analytical_pressure_jacobian!(J,sens,v,config)
 
 
 physical_space_sensors(obs::PressureObservations) = physical_space_sensors(obs.sens,obs.config)
 physical_space_sensors(sens,config::VortexConfig) = sens
-physical_space_sensors(sens,config::VortexConfig{Bodies.ConformalBody}) = physical_space_sensors(sens,config.body)
+physical_space_sensors(sens,config::VortexConfig{Body}) = physical_space_sensors(sens,config.body)
 physical_space_sensors(sens,body::Bodies.ConformalBody) = Bodies.conftransform(sens,body)
 
 

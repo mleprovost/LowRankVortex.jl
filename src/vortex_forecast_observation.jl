@@ -147,7 +147,7 @@ function jacob!(J,x::AbstractVector,t,obs::SymmetricVortexPressureObservations{N
 	@unpack sens,config,wtarget,dpd,dpdstar,Css,Cts,∂Css,Ctsblob,∂Ctsblob = obs
 
 	return symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
-														sens, vcat(state_to_lagrange(x, config)...), 1:config.Nv, t)
+														sens, vcat(state_to_lagrange(x, config)...), 1:config.Nv, config.state_id, t)
 end
 
 function jacob!(J,x::AbstractVector,t,obs::SymmetricVortexPressureObservations{Nx,Ny,true}) where {Nx,Ny}
@@ -155,7 +155,7 @@ function jacob!(J,x::AbstractVector,t,obs::SymmetricVortexPressureObservations{N
 	@unpack U = config
 	freestream = Freestream(U)
 	return symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
-										sens, vcat(state_to_lagrange(x, config)...), freestream, 1:config.Nv, t)
+										sens, vcat(state_to_lagrange(x, config)...), freestream, 1:config.Nv, config.state_id, t)
 end
 
 
@@ -168,13 +168,17 @@ This function would typically be used before and after the analysis step to enfo
 """
 state_filter!(x, obs::SymmetricVortexPressureObservations) = symmetry_state_filter!(x, obs.config)
 
-# DEPENDS ON STATE ARRANGEMENT
 function symmetry_state_filter!(x, config::VortexConfig)
-	@inbounds for j=1:config.Nv
+	@unpack Nv, state_id = config
+
+	y_ids = state_id["vortex y"]
+	Γ_ids = state_id["vortex Γ"]
+
+	@inbounds for j=1:Nv
 		# Ensure that vortices stay above the x axis
-		x[3*j-1] = clamp(x[3*j-1], 1e-2, Inf)
+		x[y_ids[j]] = clamp(x[y_ids[j]], 1e-2, Inf)
 		# Ensure that the circulation remains positive
-    	x[3*j] = clamp(x[3*j], 0.0, Inf)
+    x[Γ_ids[j]] = clamp(x[Γ_ids[j]], 0.0, Inf)
 	end
     return x
 end
@@ -195,20 +199,21 @@ function dobsobs(obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx,Ny}
     return dYY
 end
 
-# DEPENDS ON STATE ARRANGEMENT
-#function dstateobs(X::BasicEnsembleMatrix{Nx,Ne}, obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx,Ny,Ne}
-function dstateobs(X, obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx,Ny}
+function dstateobs(X::BasicEnsembleMatrix{Nx,Ne}, obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx,Ny,Ne}
+#function dstateobs(X, obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx,Ny}
 
 	@unpack config, sens = obs
-	@unpack Nv = config
+	@unpack Nv, state_id = config
 
-	Ne = size(X,2)
+	x_ids = state_id["vortex x"]
+	y_ids = state_id["vortex y"]
+	Γ_ids = state_id["vortex Γ"]
 
 	dXY = zeros(Nx, Ny)
 	for i in 1:Ne
 		#zi, Γi = state_to_positions_and_strengths(X(i),config)
 		xi = X(i)
-		zi = map(l->xi[3*l-2] + im*xi[3*l-1], 1:Nv)
+		zi = map(l->xi[x_ids[l]] + im*xi[y_ids[l]], 1:Nv)
 
 		for J in 1:Nv
 				for k in 1:Ny
@@ -220,16 +225,20 @@ function dstateobs(X, obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx
 	return dXY
 end
 
-# DEPENDS ON STATE ARRANGEMENT
 function apply_state_localization!(Σxy,X,Lxy,obs::AbstractCartesianVortexObservations)
 	@unpack config = obs
+	@unpack Nv, state_id = config
   dxy = dstateobs(X, obs)
   Gxy = gaspari.(dxy./Lxy)
 
-  for J=1:config.Nv
-      for i=-2:0
-         Σxy[3*J+i,:] .*= Gxy[J,:]
-      end
+	x_ids = state_id["vortex x"]
+	y_ids = state_id["vortex y"]
+	Γ_ids = state_id["vortex Γ"]
+
+  for J=1:Nv
+		Σxy[x_ids[J],:] .*= Gxy[J,:]
+		Σxy[y_ids[J],:] .*= Gxy[J,:]
+		Σxy[Γ_ids[J],:] .*= Gxy[J,:]
   end
   return nothing
 end

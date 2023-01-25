@@ -7,10 +7,10 @@ strength(v::Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}) = v.S
 strength(v::Vector{T}) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(vj -> strength(vj),v)
 
 
-analytical_pressure(ζ,v::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where {T<:Element} = analytical_pressure(ζ,v,config.body;kwargs...)
+analytical_pressure(ζ,v::Vector{T},config::VortexConfig{Body};kwargs...) where {T<:Element} = analytical_pressure(ζ,v,config.body;kwargs...)
 analytical_pressure(ζ,v::Vector{T},config::VortexConfig;kwargs...) where {T<:Element} = analytical_pressure(ζ,v;kwargs...)
 
-analytical_pressure(z,v::Vector{T},config::VortexConfig{DataType}) where {T<:Element} =
+analytical_pressure(z,v::Vector{T},config::VortexConfig{WT}) where {T<:Element, WT<:ImageType} =
     analytical_pressure(z,v;ϵ=config.δ,walltype=config.body)
 
 
@@ -46,7 +46,7 @@ end
 
 ### FORCE ###
 
-function analytical_force(v::Vector{T},config::VortexConfig{Bodies.ConformalBody};kwargs...) where {T<:Element}
+function analytical_force(v::Vector{T},config::VortexConfig{Body};kwargs...) where {T<:Element}
     fx, fy, mr = Bodies.force(v,config.body;kwargs...)
     return [fx,fy,mr]
 end

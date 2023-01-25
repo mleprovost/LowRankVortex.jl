@@ -488,7 +488,7 @@ analytical_jacobian_position(target, source, freestream, 1:length(source), t;
                                       iscauchystored = iscauchystored)
 
 
-analytical_jacobian_pressure(target, source, freestream, t) = analytical_jacobian_pressure(target, source, freestream, 1:length(source), t)
+analytical_jacobian_pressure(target, source, freestream, t) = analytical_jacobian_pressure(target, source, freestream, 1:length(source), construct_state_mapping(length(source)), t)
 
 
 """
@@ -496,9 +496,9 @@ Returns the Jacobian of the pressure computed from the unsteady Bernoulli equati
 the positions, conjugate positions, strengths and conjugate strengths  of the singularities.
 Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
 """
-function analytical_jacobian_pressure(target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
+function analytical_jacobian_pressure(target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, state_id::Dict, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 	Nv = size(source, 1)
-	Nx = 3*Nv
+	Nx = state_length(state_id)
 	Ny = size(target, 1)
 
 	J = zeros(Ny, Nx)
@@ -511,7 +511,7 @@ function analytical_jacobian_pressure(target, source::T, freestream, idx::Union{
 	Css = zeros(ComplexF64, Nv, Nv)
 	Cts = zeros(ComplexF64, Ny, Nv)
 
-	analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source, freestream, idx, t)
+	analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source, freestream, idx, state_id, t)
 	return J
 end
 
@@ -521,9 +521,9 @@ Returns the Jacobian of the pressure computed from the unsteady Bernoulli equati
 the positions, conjugate positions, strengths and conjugate strengths  of the blobs.
 Note that we multiply the strength `point.S` of a singularity by -i to move from the convention Γ+iQ (used in PotentialFlow.jl) to Q-iΓ.
 """
-function analytical_jacobian_pressure(target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
+function analytical_jacobian_pressure(target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, state_id::Dict, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
 	Nv = size(source, 1)
-	Nx = 3*Nv
+	Nx = state_length(state_id)
 	Ny = size(target, 1)
 
 	J = zeros(Ny, Nx)
@@ -540,18 +540,19 @@ function analytical_jacobian_pressure(target, source::T, freestream, idx::Union{
 	Ctsblob = zeros(ComplexF64, Ny, Nv)
 	∂Ctsblob = zeros(Ny, Nv)
 
-	analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source, freestream, idx, t)
+	analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source, freestream, idx, state_id, t)
 	return J
 end
 
-
-# DEPENDS ON STATE ARRANGEMENT
-
 # In-place version for point vortices
-function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
+function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, state_id::Dict, t) where T <: Vector{PotentialFlow.Points.Point{Float64, Float64}}
 	Nv = size(source, 1)
-	Nx = 3*Nv
+	Nx = state_length(state_id)
 	Ny = size(target, 1)
+
+  x_ids = state_id["vortex x"]
+  y_ids = state_id["vortex y"]
+  Γ_ids = state_id["vortex Γ"]
 
 	@assert size(J) == (Ny, Nx)
 	@assert size(wtarget) == (Ny,)
@@ -602,31 +603,25 @@ function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, targe
 								  iscauchystored = true)
 
 	# Fill dpdpx and dpdy
-	# J[:, 1:3:3*(Nv-1)+1] .= 2*real.(dpd[:,1:Nv])
-	# J[:, 2:3:3*(Nv-1)+2] .= -2*imag.(dpd[:,1:Nv])
 	@inbounds for L in idx
-		J[:, 3*(L-1)+1] .= 2*real.(view(dpd,:,L))
-		J[:, 3*(L-1)+2] .= -2*imag.(view(dpd,:,L))
+		J[:, x_ids[L]] .= 2*real.(view(dpd,:,L))
+		J[:, y_ids[L]] .= -2*imag.(view(dpd,:,L))
 	end
 
 	analytical_jacobian_strength!(dpd, dpdstar, Css, Cts, wtarget, target, src, freestream, idx, t;
 								  iscauchystored = true)
 
 	@inbounds for L in idx
-  		J[:, 3*(L-1)+3] .=  2*imag.(view(dpd,:,L))
+  		J[:, Γ_ids[L]] .=  2*imag.(view(dpd,:,L))
 	end
-	# Vortices
-	# J[:, 3:3:3*(Nv-1)+3] .= 2imag.(dpd[:,1:Nv])
 
 	return J
 end
 
-# DEPENDS ON STATE ARRANGEMENT
-
 # In-place version for regularized vortices
-function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
+function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob, target, source::T, freestream, idx::Union{Int64, Vector{Int64}, UnitRange{Int64}}, state_id::Dict, t) where T <: Vector{PotentialFlow.Blobs.Blob{Float64, Float64}}
     Nv = size(source, 1)
-    Nx = 3*Nv
+    Nx = state_length(state_id)
     Ny = size(target, 1)
 
 	@assert size(J) == (Ny, Nx)
@@ -641,6 +636,10 @@ function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Cs
 	@assert typeof(Ctsblob) <: Matrix{ComplexF64}
 	@assert size(∂Ctsblob) == (Ny, Nv)
 	@assert typeof(∂Ctsblob) <: Matrix{Float64}
+
+  x_ids = state_id["vortex x"]
+  y_ids = state_id["vortex y"]
+  Γ_ids = state_id["vortex Γ"]
 
 	fill!(J, 0.0)
 	fill!(wtarget, 0.0*im)
@@ -694,22 +693,18 @@ function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Cs
 								  iscauchystored = true)
 
 	# Fill dpdpx and dpdy
-    # J[:, 1:3:3*(Nv-1)+1] .= 2*real.(dpd[:,1:Nv])
-    # J[:, 2:3:3*(Nv-1)+2] .= -2*imag.(dpd[:,1:Nv])
 	@inbounds for L in idx
-		J[:, 3*(L-1)+1] .= 2*real.(view(dpd,:,L))
-		J[:, 3*(L-1)+2] .= -2*imag.(view(dpd,:,L))
+		J[:, x_ids[L]] .= 2*real.(view(dpd,:,L))
+		J[:, y_ids[L]] .= -2*imag.(view(dpd,:,L))
 	end
 
 	analytical_jacobian_strength!(dpd, dpdstar, Css, Cts, Ctsblob, wtarget, target, src, freestream, idx, t;
 								  iscauchystored = true)
 
 	@inbounds for L in idx
-		J[:, 3*(L-1)+3] .=  2*imag.(view(dpd,:,L))
+		J[:, Γ_ids[L]] .=  2*imag.(view(dpd,:,L))
 	end
 
-    # Vortices
-    # J[:, 3:3:3*(Nv-1)+3] .= 2imag.(dpd[:,1:Nv])
     return J
 end
 
