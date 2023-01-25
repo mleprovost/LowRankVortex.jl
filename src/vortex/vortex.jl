@@ -345,5 +345,8 @@ function state_to_vortex_states(state::AbstractVector{Float64}, config::VortexCo
     return xarray
 end
 
+states_to_vortex_states(state_array::BasicEnsembleMatrix, config::VortexConfig) =
+    states_to_vortex_states(state_array.X,config)
+
 vortex_position_to_phys_space(zj,config::VortexConfig) = zj
 vortex_position_to_phys_space(zj,config::VortexConfig{Body}) = Elements.conftransform(zj,config.body)

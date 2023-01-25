@@ -1,4 +1,4 @@
-export vortexinference, gramians, adaptive_lowrank_enkf!, senkf!
+export vortexinference, adaptive_lowrank_enkf!, senkf!
 
 
 
@@ -71,7 +71,7 @@ end
 
 
 
-
+#### NEED TO REMOVE THESE IN FAVOR OF THOSE IN DA/enkf.jl #####
 
 """
       adaptive_lowrank_enkf!(X,Σx,Y,Σϵ,ystar,obs)
