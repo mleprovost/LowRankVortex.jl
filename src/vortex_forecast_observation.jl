@@ -1,8 +1,7 @@
-### Forecasting and observation operators for vortex problems ####
+### Forecasting, observation, filtering, and localization operators for vortex problems ####
 
-export VortexForecast, SymmetricVortexForecast, SymmetricVortexPressureObservations
-
-export vortex, symmetric_vortex # These should be removed
+export VortexForecast, SymmetricVortexForecast, SymmetricVortexPressureObservations,
+					PressureObservations, ForceObservations, physical_space_sensors
 
 #import TransportBasedInference: Parallel, Serial, Thread # These should not be necessary
 
@@ -156,6 +155,80 @@ function jacob!(J,x::AbstractVector,t,obs::SymmetricVortexPressureObservations{N
 	freestream = Freestream(U)
 	return symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Css, Ctsblob, ∂Ctsblob,
 										sens, vcat(state_to_lagrange(x, config)...), freestream, 1:config.Nv, config.state_id, t)
+end
+
+
+# Pressure
+
+
+struct PressureObservations{Nx,Ny,ST,CT} <: AbstractObservationOperator{Nx,Ny,true}
+    sens::ST
+    config::CT
+end
+
+"""
+    PressureObservations(sens::AbstractVector,config::VortexConfig)
+
+Constructor to create an instance of pressure sensors. The locations of the
+sensors are specified by `sens`, which should be given as a vector of
+complex coordinates.
+"""
+function PressureObservations(sens::AbstractVector,config::VortexConfig)
+    return PressureObservations{3*config.Nv,length(sens),typeof(sens),typeof(config)}(sens,config)
+end
+
+function observations(x::AbstractVector,t,obs::PressureObservations)
+  @unpack config, sens = obs
+  v = state_to_lagrange_reordered(x,config)
+  return _pressure(sens,v,config)
+end
+
+function jacob!(J,x::AbstractVector,t,obs::PressureObservations)
+    @unpack config, sens = obs
+    v = state_to_lagrange_reordered(x,config)
+    return _pressure_jacobian!(J,sens,v,config)
+end
+
+_pressure(sens,v,config::VortexConfig{Body}) = analytical_pressure(sens,v,config;preserve_circ=false)
+_pressure(sens,v,config::VortexConfig) = analytical_pressure(sens,v,config)
+
+_pressure_jacobian!(J,sens,v,config::VortexConfig{Body}) = analytical_pressure_jacobian!(J,sens,v,config;preserve_circ=false)
+_pressure_jacobian!(J,sens,v,config::VortexConfig) = analytical_pressure_jacobian!(J,sens,v,config)
+
+
+physical_space_sensors(obs::PressureObservations) = physical_space_sensors(obs.sens,obs.config)
+physical_space_sensors(sens,config::VortexConfig) = sens
+physical_space_sensors(sens,config::VortexConfig{Body}) = physical_space_sensors(sens,config.body)
+physical_space_sensors(sens,body::Bodies.ConformalBody) = Bodies.conftransform(sens,body)
+
+
+
+# Force
+
+struct ForceObservations{Nx,Ny,ST,CT} <: AbstractObservationOperator{Nx,Ny,false}
+    sens::ST
+    config::CT
+end
+
+"""
+    ForceObservations(config::VortexConfig)
+
+Constructor to create an instance of force sensing.
+"""
+function ForceObservations(config::VortexConfig)
+    return ForceObservations{3*config.Nv,3,Nothing,typeof(config)}(nothing,config)
+end
+
+function observations(x::AbstractVector,t,obs::ForceObservations)
+  @unpack config = obs
+  v = state_to_lagrange_reordered(x,config)
+  return analytical_force(v,config)
+end
+
+function jacob!(J,x::AbstractVector,t,obs::ForceObservations)
+    @unpack config = obs
+    v = state_to_lagrange_reordered(x,config)
+    analytical_force_jacobian!(J,v,config)
 end
 
 

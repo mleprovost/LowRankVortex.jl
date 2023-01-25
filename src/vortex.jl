@@ -1,4 +1,6 @@
-export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_state_mapping
+export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_state_mapping,
+          state_to_positions_and_strengths, positions_and_strengths_to_state,
+          state_to_vortex_states, states_to_vortex_states
 
 
 abstract type ImageType end
@@ -64,6 +66,56 @@ _walltype(body) = body
 
 
 Base.length(config::VortexConfig) = config.Nv
+
+# Mapping from vortex elements and other degrees of freedom to the state components
+construct_state_mapping(Nv,body) = construct_state_mapping(Nv)
+construct_state_mapping(Nv,::Bodies.ConformalBody) = construct_state_mapping_conformal(Nv)
+
+
+function construct_state_mapping(Nv::Int64)
+  state_id = Dict()
+  vortex_x_ids = zeros(Int,Nv)
+  vortex_y_ids = zeros(Int,Nv)
+  vortex_Γ_ids = zeros(Int,Nv)
+  for j in 1:Nv
+    vortex_x_ids[j] = 3j-2
+    vortex_y_ids[j] = 3j-1
+    vortex_Γ_ids[j] = 3j
+  end
+  state_id["vortex x"] = vortex_x_ids
+  state_id["vortex y"] = vortex_y_ids
+  state_id["vortex Γ"] = vortex_Γ_ids
+
+  return state_id
+end
+
+function construct_state_mapping_conformal(Nv::Int64)
+  state_id = Dict()
+  vortex_logr_ids = zeros(Int,Nv)
+  vortex_rΘ_ids = zeros(Int,Nv)
+  vortex_Γ_ids = zeros(Int,Nv)
+  for j in 1:Nv
+    vortex_logr_ids[j] = 3j-2
+    vortex_rΘ_ids[j] = 3j-1
+    vortex_Γ_ids[j] = 3j
+  end
+  state_id["vortex logr"] = vortex_logr_ids
+  state_id["vortex rΘ"] = vortex_rΘ_ids
+  state_id["vortex Γ"] = vortex_Γ_ids
+
+  return state_id
+end
+
+"""
+    state_length(config::VortexConfig)
+
+Return the number of components of the state vector
+"""
+state_length(config::VortexConfig) =  state_length(config.state_id)
+
+state_length(a::Dict) = mapreduce(key -> state_length(a[key]),+,keys(a))
+state_length(a::Vector) = length(a)
+
 
 "A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).
  Use `lagrange_to_state` for the inverse transformation."
@@ -231,55 +283,48 @@ function positions_and_strengths_to_state(ζv::AbstractVector{ComplexF64},Γv::A
   return state
 end
 
+"""
+    states_to_vortex_states(state_array::Matrix,config::VortexConfig)
 
-
-
-
-# Mapping from vortex elements and other degrees of freedom to the state components
-construct_state_mapping(Nv,body) = construct_state_mapping(Nv)
-construct_state_mapping(Nv,::Bodies.ConformalBody) = construct_state_mapping_conformal(Nv)
-
-
-function construct_state_mapping(Nv::Int64)
-  state_id = Dict()
-  vortex_x_ids = zeros(Int,Nv)
-  vortex_y_ids = zeros(Int,Nv)
-  vortex_Γ_ids = zeros(Int,Nv)
-  for j in 1:Nv
-    vortex_x_ids[j] = 3j-2
-    vortex_y_ids[j] = 3j-1
-    vortex_Γ_ids[j] = 3j
-  end
-  state_id["vortex x"] = vortex_x_ids
-  state_id["vortex y"] = vortex_y_ids
-  state_id["vortex Γ"] = vortex_Γ_ids
-
-  return state_id
+Take an array of states (length(state) x nstates) and convert it to a (3 x Nv*nstates) array
+of individual vortex states.
+"""
+function states_to_vortex_states(state_array::AbstractMatrix{Float64}, config::VortexConfig)
+   Nv = length(config)
+   ndim, nstates = size(state_array)
+   vortex_array = zeros(3,Nv*nstates)
+   for j in 1:nstates
+     vortexstatej = state_to_vortex_states(state_array[:,j],config)
+     vortex_array[:,(j-1)*Nv+1:j*Nv] = vortexstatej
+   end
+   return vortex_array
 end
 
-function construct_state_mapping_conformal(Nv::Int64)
-  state_id = Dict()
-  vortex_logr_ids = zeros(Int,Nv)
-  vortex_rΘ_ids = zeros(Int,Nv)
-  vortex_Γ_ids = zeros(Int,Nv)
-  for j in 1:Nv
-    vortex_logr_ids[j] = 3j-2
-    vortex_rΘ_ids[j] = 3j-1
-    vortex_Γ_ids[j] = 3j
-  end
-  state_id["vortex logr"] = vortex_logr_ids
-  state_id["vortex rΘ"] = vortex_rΘ_ids
-  state_id["vortex Γ"] = vortex_Γ_ids
 
-  return state_id
+"""
+    index_of_vortex_state(v::Integer,config::VortexConfig)
+
+Return the column of a (length(state) x nstates) array of states
+that a single vortex of index `v` in a (3 x Nv*nstates) vortex state array belongs to.
+"""
+index_of_vortex_state(v::Int,config::VortexConfig) = (v-1)÷length(config)+1
+
+"""
+    state_to_vortex_states(state::AbstractVector,config::VortexConfig)
+
+Given a state `state`, return a 3 x Nv array of the vortex states.
+"""
+function state_to_vortex_states(state::AbstractVector{Float64}, config::VortexConfig)
+    @unpack Nv = config
+    zv, Γv = state_to_positions_and_strengths(state,config)
+    xarray = zeros(3,Nv)
+    for v in 1:Nv
+        zv_v = vortex_position_to_phys_space(zv[v],config)
+        xarray[:,v] .= [real(zv_v),imag(zv_v),Γv[v]]
+        #push!(xarray,[real(zv[v]),imag(zv[v]),Γv[v]])
+    end
+    return xarray
 end
 
-"""
-    state_length(config::VortexConfig)
-
-Return the number of components of the state vector
-"""
-state_length(config::VortexConfig) =  state_length(config.state_id)
-
-state_length(a::Dict) = mapreduce(key -> state_length(a[key]),+,keys(a))
-state_length(a::Vector) = length(a)
+vortex_position_to_phys_space(zj,config::VortexConfig) = zj
+vortex_position_to_phys_space(zj,config::VortexConfig{Body}) = Elements.conftransform(zj,config.body)
