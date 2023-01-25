@@ -4,9 +4,9 @@ export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, constru
 abstract type ImageType end
 abstract type Body <: ImageType end
 abstract type Cylinder <: ImageType end
-abstract type FlatWall <: ImageType end
 abstract type NoWall <: ImageType end
-abstract type OldFlatWall <: ImageType end
+abstract type FlatWall <: ImageType end # For case in which images are simply included as extra terms
+abstract type OldFlatWall <: ImageType end # Meant for case in which images are explicitly created
 
 
 
