@@ -2,10 +2,6 @@ export analytical_pressure, analytical_dpdzv, analytical_dpdΓv, analytical_forc
         analytical_dfdΓv
 
 
-# A few helper routines
-strength(v::Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}) = v.S
-strength(v::Vector{T}) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(vj -> strength(vj),v)
-
 
 analytical_pressure(ζ,v::Vector{T},config::VortexConfig{Body};kwargs...) where {T<:Element} = analytical_pressure(ζ,v,config.body;kwargs...)
 analytical_pressure(ζ,v::Vector{T},config::VortexConfig;kwargs...) where {T<:Element} = analytical_pressure(ζ,v;kwargs...)

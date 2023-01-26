@@ -39,7 +39,7 @@ include("pressure/symmetric_pressure.jl")
 include("pressure/symmetric_analytical_jacobian_pressure.jl")
 include("pressure/symmetric_analytical_jacobian_pressure_freestream.jl")
 include("pressure/jacobian.jl")
-include("pressure/pressure_utilities.jl")
+include("pressure/pressure_decomposed.jl")
 include("pressure/cylinder_analytical_jacobian_pressure.jl")
 
 

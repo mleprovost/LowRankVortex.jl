@@ -10,6 +10,10 @@ abstract type NoWall <: ImageType end
 abstract type FlatWall <: ImageType end # For case in which images are simply included as extra terms
 abstract type OldFlatWall <: ImageType end # Meant for case in which images are explicitly created
 
+# A few helper routines
+strength(v::Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}) = v.S
+strength(v::Vector{T}) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(vj -> strength(vj),v)
+
 
 
 """
