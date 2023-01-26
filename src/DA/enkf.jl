@@ -1,3 +1,32 @@
+#=
+Generically, the user should define subtypes of AbstractForecastOperator
+and AbstractObservationOperator, and then define
+- An overloaded version of `forecast` function for specific AbstractForecastOperator subtype (with internal cache)
+- An overloaded version of `observations` function for specific AbstractObservationOperator subtype (with internal cache)
+- An overloaded version of `jacob!`` function for specific AbstractObservationOperator subtype
+- A state filter function for specific AbstractObservationOperator subtype
+- A function `ytrue(t)` for supplying the truth data as a function of time.
+
+The instances of the forecast and observation operator data are given as arguments
+to an overarching EnKF parameters type, a subtype of AbstractSeqFilter. This
+parameters type is also used to set algorithm metaparameters and, by dispatch, to
+set the specific flavor of EnKF (e.g., StochEnKFParameters <: AbstractSeqFilter will automatically
+choose a stochastic EnKF, whereas LREnKFParameters will specify low-rank EnKF.
+
+The signature of the forecast operator should be
+forecast(x,t,Δt,fdata::AbstractForecastOperator)
+
+The signature of the forecast operator should be
+observations(x,t,odata::AbstractObservationOperator)
+
+The signature of the Jacobian operator should be
+jacob!(J,x,t,odata::AbstractObservationOperator)
+
+The signature of the state filter function should be
+state_filter!(x,odata::AbstractObservationOperator)
+=#
+
+
 export StochEnKFParameters, LREnKFParameters, enkf
 
 const RXDEFAULT = 100
@@ -118,26 +147,7 @@ end
 ######## NEW ENKF #########
 ###########################
 
-#=
-Generically, the user should supply
-- An overloaded version of forecast! function for specific AbstractForecastOperator type (with internal cache)
-- An overloaded version of observations! function for specific AbstractObservationOperator type (with internal cache)
-- An overloaded version of jacob! function for specific AbstractObservationOperator
-- A state filter function
-- A function `true_observations(t,obsdata)` of supplying the truth data as a function of time.
 
-The signature of the forecast operator should be
-forecast!(x,t,foredata::AbstractForecastOperator)
-
-The signature of the forecast operator should be
-observations!(x,t,obsdata::AbstractObservationOperator)
-
-The signature of the Jacobian operator should be
-jacob!(J,x,t,obsdata::AbstractObservationOperator)
-
-The signature of the state filter function should be
-state_filter!(x,obsdata::AbstractObservationOperator)
-=#
 
 
 """
