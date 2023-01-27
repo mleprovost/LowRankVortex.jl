@@ -1,71 +1,33 @@
-export vortex, symmetric_vortex
+# subtypes of AbstractForecastOperator should provide
+#  - an extension of the forecast operator
+#  - an internal cache in their structure
 
-import TransportBasedInference: Parallel, Serial, Thread
+export forecast, forecast!, AbstractForecastOperator, IdentityForecastOperator
 
-
-vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool = false) = vortex(X, t, Ny, Nx, cachevels, config, serial, withfreestream = withfreestream)
-
-"""
-This routine advects the regularized point vortices of the different ensemble members stored in X by a time step config.Δt.
-"""
-function vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestream::Bool=false)
-	Nypx, Ne = size(X)
-	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
-
-	freestream = Freestream(config.U)
-
-	@inbounds for i = 1:Ne
-		col = view(X, Ny+1:Nypx, i)
-		source = state_to_lagrange(col, config)
-
-		# Compute the induced velocity (by exploiting the symmetry of the problem)
-		reset_velocity!(cachevels, source)
-		self_induce_velocity!(cachevels, source, t)
-
-		if withfreestream == true
-			induce_velocity!(cachevels, source, freestream, t)
-		end
-
-		# Advect the system
-		advect!(source, source, cachevels, config.Δt)
-
-		X[Ny+1:Nypx, i] .= lagrange_to_state(source, config)
-	end
-
-	return X, t + config.Δt
-end
+abstract type AbstractForecastOperator{Nx} end
 
 """
-This routine advects the point vortices of the different ensemble members stored in X by a time step config.Δt.
-Note that this version assumes that for each vortex with strength Γ_J located at z_J,
-there is a mirror point vortex with strength -Γ_J located at conj(z_J).
+    forecast(x::AbstractVector,t::Float64,Δt::Float64,fdata::AbstractForecastOperator) -> x
+
+Forecast the state `x` at time `t` to its value at the next time `t+Δt`.
+The default forecast function is simply the identity.
 """
-symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config; withfreestream::Bool=false) = symmetric_vortex(X, t, Ny, Nx, cachevels, config, serial; withfreestream = withfreestream)
+function forecast(x,t,Δt,::AbstractForecastOperator) end
 
-function symmetric_vortex(X, t::Float64, Ny, Nx, cachevels, config, P::Serial; withfreestream::Bool=false)
-	Nypx, Ne = size(X)
-	@assert Nypx == Ny + Nx "Wrong value of Ny or Nx"
-	freestream = Freestream(config.U)
-	@inbounds for i = 1:Ne
-		col = view(X, Ny+1:Nypx, i)
-		source = state_to_lagrange(col, config)
+struct IdentityForecastOperator{Nx} <: AbstractForecastOperator{Nx} end
 
-		# Compute the induced velocity (by exploiting the symmetry of the problem)
-		reset_velocity!(cachevels, source)
-		self_induce_velocity!(cachevels[1], source[1], t)
-		induce_velocity!(cachevels[1], source[1], source[2], t)
+forecast(x,t,Δt,::IdentityForecastOperator) = x
 
-		if withfreestream == true
-			induce_velocity!(cachevels[1], source[1], freestream, t)
-		end
-		# @. cachevels[2] = conj(cachevels[1])
 
-		# We only care about the transport of the top vortices
-		# Advect the system
-		advect!(source[1:1], source[1:1], cachevels[1:1], config.Δt)
+"""
+    forecast!(X::BasicEnsembleMatrix,t,Δt,fdata::AbstractForecastOperator)
 
-		X[Ny+1:Nypx, i] .= lagrange_to_state(source, config)
-	end
-
-	return X, t + config.Δt
+In-place forecast updating of ensemble matrix `X`, using the specific `forecast` function
+defined for `fdata`.
+"""
+function forecast!(X::BasicEnsembleMatrix{Nx,Ne},t,Δt,fdata::AbstractForecastOperator) where {Nx,Ne}
+  for j in 1:Ne
+    X(j) .= forecast(X(j),t,Δt,fdata)
+  end
+  return X
 end

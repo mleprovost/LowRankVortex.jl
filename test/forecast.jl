@@ -5,21 +5,17 @@
     Nx = 3*Nv
     Ne = 5
 
-    sensors = -11.0:0.5:10.0
     U = complex(0.0)
 
     config = let Nv = Nv,
                  U = U,
-                 ss = sensors, Δt = 5e-3, δ = 1e-1,
-                 ϵX = 1e-3, ϵΓ = 1e-3,
-                 β = 1.0,
-                 ϵY = 1e-2
-        VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+                 Δt = 5e-3, δ = 1e-1
+        VortexConfig(Nv, U, Δt, δ;body=LowRankVortex.OldFlatWall)
     end
+
     # Test vortex routine
     x = rand(Nx)
-    X = repeat(x, 1, Ne)
-    X0 = deepcopy(X)
+    X0 = BasicEnsembleMatrix(repeat(x, 1, Ne))
     t0 = 1.8
     sys = state_to_lagrange(x, config)
     sys0 = deepcopy(sys)
@@ -28,27 +24,27 @@
 
     advect!(sys₊, sys0, vels, config.Δt)
 
-    cachevels = allocate_velocity(state_to_lagrange(zeros(Nx), config))
-    X1, t1 = vortex(deepcopy(X0), t0, 0, Nx, cachevels, config)
+    fdata = VortexForecast(config)
+    X = deepcopy(X0)
+    forecast!(X,t0,config.Δt,fdata)
 
     for i=1:Ne
-        @test isapprox(X1[:,i], lagrange_to_state(sys₊, config), atol = atol)
+        @test isapprox(X(i), lagrange_to_state(sys₊, config), atol = atol)
     end
 
     # Test that the symmetry is correclty enforced
     X = rand(Nx, Ne)
-    X0 = deepcopy(X)
+    X0 = BasicEnsembleMatrix(X)
     t0 = 1.5
 
-    cachevels = allocate_velocity(state_to_lagrange(zeros(Nx), config))
-
-    X1, t1 = vortex(deepcopy(X0), t0, 0, Nx, cachevels, config)
-
-    X2, t2 = symmetric_vortex(deepcopy(X0), t0, 0, Nx, cachevels, config)
+    fsdata = SymmetricVortexForecast(config)
+    X1 = deepcopy(X0)
+    X2 = deepcopy(X0)
+    forecast!(X1,t0,config.Δt,fdata)
+    forecast!(X2,t0,config.Δt,fsdata)
 
     @test isapprox(X1, X2, atol = atol)
-    @test isapprox(t1, t0 + config.Δt, atol = atol)
-    @test isapprox(t2, t0 + config.Δt, atol = atol)
+
 end
 
 @testset "Validate vortex and symmetric_vortex with freestream" begin
@@ -58,22 +54,23 @@ end
     Nx = 3*Nv
     Ne = 5
 
-    sensors = -11.0:0.5:10.0
     U = rand(ComplexF64)
     freestream = Freestream(U)
 
     config = let Nv = Nv,
                  U = U,
-                 ss = sensors, Δt = 5e-3, δ = 1e-1,
-                 ϵX = 1e-3, ϵΓ = 1e-3,
-                 β = 1.0,
-                 ϵY = 1e-2
-        VortexConfig(Nv, U, ss, Δt, δ, ϵX, ϵΓ, β, ϵY)
+                 Δt = 5e-3, δ = 1e-1
+        VortexConfig(Nv, U, Δt, δ;body=LowRankVortex.OldFlatWall)
     end
+    config_nofs = let Nv = Nv,
+                 U = complex(0.0),
+                 Δt = 5e-3, δ = 1e-1
+        VortexConfig(Nv, U, Δt, δ;body=LowRankVortex.OldFlatWall)
+    end
+
     # Test vortex routine
     x = rand(Nx)
-    X = repeat(x, 1, Ne)
-    X0 = deepcopy(X)
+    X0 = BasicEnsembleMatrix(repeat(x, 1, Ne))
     t0 = 1.8
     sys = state_to_lagrange(x, config)
     sys0 = deepcopy(sys)
@@ -83,30 +80,39 @@ end
 
     advect!(sys₊, sys0, vels, config.Δt)
 
-    cachevels = allocate_velocity(state_to_lagrange(zeros(Nx), config))
-    X1, t1 = vortex(deepcopy(X0), t0, 0, Nx, cachevels, config, withfreestream = true)
-    X2, t1 = vortex(deepcopy(X0), t0, 0, Nx, cachevels, config, withfreestream = false)
+    fdata = VortexForecast(config)
+    fdata_nofs = VortexForecast(config_nofs)
 
-    X2[1:3:end,:] .+= real(config.U)*config.Δt
-    X2[2:3:end,:] .+= imag(config.U)*config.Δt
+    X1 = deepcopy(X0)
+    X2 = deepcopy(X0)
+
+    forecast!(X1,t0,config.Δt,fdata)
+    forecast!(X2,t0,config.Δt,fdata_nofs)
+
+    for i = 1:Ne
+      x = X2(i)
+      x[config.state_id["vortex x"]] .+= real(config.U)*config.Δt
+      x[config.state_id["vortex y"]] .+= imag(config.U)*config.Δt
+    end
+
 
     for i=1:Ne
-        @test isapprox(X1[:,i], lagrange_to_state(sys₊, config), atol = atol)
-        @test isapprox(X2[:,i], lagrange_to_state(sys₊, config), atol = atol)
+        @test isapprox(X1(i), lagrange_to_state(sys₊, config), atol = atol)
+        @test isapprox(X2(i), lagrange_to_state(sys₊, config), atol = atol)
     end
 
     # Test that the symmetry is correclty enforced
     X = rand(Nx, Ne)
-    X0 = deepcopy(X)
+    X0 = BasicEnsembleMatrix(X)
     t0 = 1.5
 
-    cachevels = allocate_velocity(state_to_lagrange(zeros(Nx), config))
-
-    X1, t1 = vortex(deepcopy(X0), t0, 0, Nx, cachevels, config; withfreestream = true)
-
-    X2, t2 = symmetric_vortex(deepcopy(X0), t0, 0, Nx, cachevels, config; withfreestream = true)
+    fdata = VortexForecast(config)
+    fsdata = SymmetricVortexForecast(config)
+    X1 = deepcopy(X0)
+    X2 = deepcopy(X0)
+    forecast!(X1,t0,config.Δt,fdata)
+    forecast!(X2,t0,config.Δt,fsdata)
 
     @test isapprox(X1, X2, atol = atol)
-    @test isapprox(t1, t0 + config.Δt, atol = atol)
-    @test isapprox(t2, t0 + config.Δt, atol = atol)
+
 end

@@ -1,21 +1,7 @@
 export pressure!, pressure,
        pressure_FD!, pressure_FD,
-       pressure_AD,
-       measure_state
+       pressure_AD
 
-"""
-Evaluates the pressure induced at `config.ss` by the regularized point vortices stored in `state`,
-and an optional freestream of amplitude `config.U`.
-The pressure is computed from the unsteady Bernoulli equation.
-"""
-function measure_state(state, t, config::VortexConfig; withfreestream::Bool=false)
-    if withfreestream == false
-        return pressure(config.ss, state_to_lagrange(state, config), t)
-    else
-        freestream = Freestream(config.U)
-        return pressure(config.ss, state_to_lagrange(state, config), freestream, t)
-    end
-end
 
 """
 Evaluates in-place the pressure induced at `target` by the point vortices `source`.
