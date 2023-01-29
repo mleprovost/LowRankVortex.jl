@@ -1,7 +1,7 @@
 export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_state_mapping,
           state_to_positions_and_strengths, positions_and_strengths_to_state,
           state_to_vortex_states, states_to_vortex_states, state_covariance,
-          number_of_vortices
+          number_of_vortices, vorticity
 
 
 abstract type ImageType end
@@ -356,3 +356,39 @@ states_to_vortex_states(state_array::BasicEnsembleMatrix, config::VortexConfig) 
 
 vortex_position_to_phys_space(zj,config::VortexConfig) = zj
 vortex_position_to_phys_space(zj,config::VortexConfig{Body}) = Elements.conftransform(zj,config.body)
+
+
+"""
+    vorticity(x,y,μ::AbstactVector,Σ::AbstractMatrix,config::VortexConfig)
+
+Evaluate the vorticity at point x,y, given the mean state vector `μ` and uncertainty matrix `Σ`
+"""
+function vorticity(x,y,μ::Vector,Σ::AbstractMatrix,config::VortexConfig)
+    @unpack Nv, state_id = config
+
+    x_ids = state_id["vortex x"]
+    y_ids = state_id["vortex y"]
+    Γ_ids = state_id["vortex Γ"]
+    xvec = [x,y]
+    w = 0.0
+    for j = 1:Nv
+        xidj, yidj, Γidj = x_ids[j], y_ids[j], Γ_ids[j]
+        μxj = μ[[xidj,yidj]]
+        Σxxj = Σ[xidj:yidj,xidj:yidj]
+        ΣΓxj = Σ[xidj:yidj,Γidj]
+        μΓj = μ[Γidj]
+        wj = vorticity(xvec,μxj,μΓj,Σxxj,ΣΓxj)
+        #wj = exp(-0.5*xvec'*inv(Σxxj)*xvec)
+        #wj *= (μΓj + ΣΓxj'*inv(Σxxj)*xvec)
+        w += wj
+    end
+    return w
+end
+
+
+function vorticity(xvec::Vector, μx, μΓ, Σxx, ΣΓx)
+    xvec_rel = xvec .- μx
+    w = exp(-0.5*xvec_rel'*inv(Σxx)*xvec_rel)
+    w *= (μΓ + ΣΓx'*inv(Σxx)*xvec_rel)
+    return w
+end

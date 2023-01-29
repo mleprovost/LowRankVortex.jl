@@ -4,6 +4,7 @@ using MakieCore
 using LaTeXStrings
 
 export color_palette
+export draw_ellipse
 
 
 """
@@ -71,6 +72,15 @@ function MakieCore.convert_arguments(P::Union{Type{<:LowRankVortex.Trajectory},T
     end
     =#
     return x,y,Γ
+end
+
+function draw_ellipse(μ::Vector,Σ::AbstractMatrix)
+    θ = range(0,2π,length=100)
+    xc, yc = cos.(θ), sin.(θ)
+    sqrtΣ = sqrt(Σ)
+    xell = μ[1] .+ sqrtΣ[1,1]*xc .+ sqrtΣ[1,2]*yc
+    yell = μ[2] .+ sqrtΣ[2,1]*xc .+ sqrtΣ[2,2]*yc
+    return xell,yell
 end
 
 
