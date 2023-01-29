@@ -5,7 +5,7 @@
 # Nx is number of states, Ny is number of observations
 
 export observations!, observations, AbstractObservationOperator, jacob!,
-       state_filter!, loglikelihood
+       state_filter!, normal_loglikelihood
 
 abstract type AbstractObservationOperator{Nx,Ny,withsensors} end
 
@@ -15,13 +15,13 @@ state_length(::AbstractObservationOperator{Nx,Ny}) where {Nx,Ny} = Nx
 
 
 """
-    loglikelihood(x,ystar,Σϵ,obs) -> Float64
+    normal_loglikelihood(x,t,ystar,Σϵ,obs) -> Float64
 
-For a given state `x`, return the log of the likelihood function,
+For a given state `x` at time `t`, return the log of the likelihood function,
 given observations `ystar`, noise covariance `Σϵ`, and observation structure `obs`.
 """
-function loglikelihood(x,ystar,Σϵ,obs::AbstractObservationOperator)
-    y = observations(x,obs)
+function normal_loglikelihood(x,t,ystar,Σϵ,obs::AbstractObservationOperator)
+    y = observations(x,t,obs)
     #loss = norm(ystar-y .- mean(ystar-y),Σϵ)
     loss = norm(ystar-y,Σϵ)
     return -loss^2/2

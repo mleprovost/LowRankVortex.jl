@@ -1,6 +1,7 @@
 export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_state_mapping,
           state_to_positions_and_strengths, positions_and_strengths_to_state,
-          state_to_vortex_states, states_to_vortex_states, state_covariance
+          state_to_vortex_states, states_to_vortex_states, state_covariance,
+          number_of_vortices
 
 
 abstract type ImageType end
@@ -69,8 +70,6 @@ _walltype(body::Bodies.ConformalBody) = Body
 _walltype(body) = body
 
 
-Base.length(config::VortexConfig) = config.Nv
-
 # Mapping from vortex elements and other degrees of freedom to the state components
 construct_state_mapping(Nv,body) = construct_state_mapping(Nv)
 construct_state_mapping(Nv,::Bodies.ConformalBody) = construct_state_mapping_conformal(Nv)
@@ -119,6 +118,9 @@ state_length(config::VortexConfig) =  state_length(config.state_id)
 
 state_length(a::Dict) = mapreduce(key -> state_length(a[key]),+,keys(a))
 state_length(a::Vector) = length(a)
+
+
+number_of_vortices(config::VortexConfig) = config.Nv
 
 
 "A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).
@@ -313,7 +315,7 @@ Take an array of states (length(state) x nstates) and convert it to a (3 x Nv*ns
 of individual vortex states.
 """
 function states_to_vortex_states(state_array::AbstractMatrix{Float64}, config::VortexConfig)
-   Nv = length(config)
+   Nv = number_of_vortices(config)
    ndim, nstates = size(state_array)
    vortex_array = zeros(3,Nv*nstates)
    for j in 1:nstates
@@ -330,7 +332,7 @@ end
 Return the column of a (length(state) x nstates) array of states
 that a single vortex of index `v` in a (3 x Nv*nstates) vortex state array belongs to.
 """
-index_of_vortex_state(v::Int,config::VortexConfig) = (v-1)÷length(config)+1
+index_of_vortex_state(v::Int,config::VortexConfig) = (v-1)÷number_of_vortices(config)+1
 
 """
     state_to_vortex_states(state::AbstractVector,config::VortexConfig)

@@ -56,15 +56,12 @@ function metropolis(zi::Vector{Vector{T}},nsamp::Integer,logp̃::Function,propva
     swaps = zeros(nchain-1)
     swapaccepts = zeros(nchain-1)
 
+    # Burn-in period. Don't collect data
     for j = 1:nchain
         z = copy(zi[j])
         for i in 1:burnin-1
             z, accept = mhstep(z,logp̃,propvars[j],β[j])
         end
-        newz = process_state(copy(z))
-        z_data[j][:,1] = newz
-        accept_data[j][1] = true
-        logp_data[j][1] = β[j]*logp̃(z)
     end
     for i in 2:nsamp-burnin+1
       for j = 1:nchain
@@ -75,10 +72,11 @@ function metropolis(zi::Vector{Vector{T}},nsamp::Integer,logp̃::Function,propva
         logp_data[j][i] = β[j]*logp̃(z)
       end
 
-      # Look for swaps
+      # Look for swaps, choosing two random ones
       j = rand(1:nchain-1)
+      k = rand(1:nchain-2)
       swaps[j] += 1
-      jp1 = mod(j,nchain)+1
+      jp1 = mod(j+k-1,nchain)+1
       zj = copy(z_data[j][:,i])
       zjp1 = copy(z_data[jp1][:,i])
       logjzj = logp_data[j][i]

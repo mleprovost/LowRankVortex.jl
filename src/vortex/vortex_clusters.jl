@@ -38,7 +38,7 @@ Generate a random state, taking the parameters for the vortices from the ranges
 function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig)
     zv_prior, Γv_prior = createclusters(config.Nv,1,xr,yr,Γr,0.0,0.0;body=config.body)
     vort_prior = Vortex.Blob.(zv_prior,Γv_prior,config.δ)
-    return lagrange_to_state_reordered(vort_prior,config)
+    return lagrange_to_state(vort_prior,config)
 end
 
 generate_random_states(nstates,xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig) =
