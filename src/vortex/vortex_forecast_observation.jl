@@ -354,7 +354,39 @@ function symmetry_state_filter!(x, config::VortexConfig)
 		# Ensure that the circulation remains positive
     x[Γ_ids[j]] = clamp(x[Γ_ids[j]], 0.0, Inf)
 	end
-    return x
+  return x
+end
+
+"""
+		state_filter!(x,obs::PressureObservations)
+
+A filter function to ensure that the point vortices stay above the x-axis, and retain a positive circulation.
+This function would typically be used before and after the analysis step to enforce those constraints.
+"""
+state_filter!(x, obs::PressureObservations) = flip_symmetry_state_filter!(x, obs.config)
+
+
+function flip_symmetry_state_filter!(x::Vector, config::VortexConfig)
+	@unpack Nv, state_id = config
+
+	x_ids = state_id["vortex x"]
+	y_ids = state_id["vortex y"]
+	Γ_ids = state_id["vortex Γ"]
+
+	# Flip the sign of vorticity if it is negative on average
+	Γtot = sum(x[Γ_ids])
+	x[Γ_ids] = Γtot < 0 ? -x[Γ_ids] : x[Γ_ids]
+
+	# Sort the vortices by strength to try to ensure they don't take each other's role
+	id_sort = sortperm(x[Γ_ids])
+	x[x_ids] = x[x_ids[id_sort]]
+	x[y_ids] = x[y_ids[id_sort]]
+	x[Γ_ids] = x[Γ_ids[id_sort]]
+
+	# Make all y locations positive
+	x[y_ids] = abs.(x[y_ids])
+
+  return x
 end
 
 

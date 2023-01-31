@@ -1,11 +1,15 @@
 #using RecipesBase
 using ColorTypes
-using MakieCore
+#using MakieCore
 using LaTeXStrings
+using CairoMakie
 
 export color_palette
 export draw_ellipse
-
+export data_histogram, show_vortices, show_vortices!, show_vortex_samples,
+        show_vortex_samples!, plot_vorticity, plot_vorticity!, vortex_ellipses,
+        vortex_ellipses!, plot_pressure_field, plot_pressure_field!, plot_sensor_data,
+        plot_sensor_data!, plot_sensors!
 
 """
 A palette of colors for plotting
@@ -22,12 +26,178 @@ const color_palette = [colorant"firebrick";
 
 #const color_palette2 = cgrad(:tab20, 10, categorical = true)
 
+"""
+    data_histogram(x::Vector[;bins=80,xlims=(-2,2)])
+
+Create a histogram of the data in vector `x`.
+"""
+function data_histogram(x::Vector{T};bins=80,xlims = (-2,2), kwargs...) where {T<:Real}
+    f = Figure()
+    ax1 = f[1, 1] = Axis(f;kwargs...)
+    hist!(ax1,x,bins=bins)
+    xlims!(ax1, xlims...)
+    f
+end
+
+
+function show_vortices!(ax,x::Vector,obs::AbstractObservationOperator)
+    vort_array = state_to_vortex_states(x,obs.config)
+    scatter!(ax,vort_array[1,:],vort_array[2,:])
+end
+
+"""
+    show_vortices(x::Vector,obs::AbstractObservationOperator)
+
+Given state vector `x`, create a plot that depicts the vortex positions.
+"""
+function show_vortices(x::Vector,obs::AbstractObservationOperator;kwargs...)
+    f = Figure()
+    ax = f[1, 1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y",kwargs...)
+    show_vortices!(ax,x,obs)
+    f
+end
+
+
+function show_vortex_samples!(ax,x_samples::Array,obs::AbstractObservationOperator;kwargs...)
+    vort_array = states_to_vortex_states(x_samples,obs.config)
+    scatter!(ax,vort_array[1,:],vort_array[2,:],markersize=1,label="sample")
+
+end
+
+"""
+    show_vortex_samples(x_samples,obs)
+
+Plot the samples of an ensemble of states as a scatter plot of vortex positions. Note that
+`x_samples` must be of size Nstate x Ne.
+"""
+function show_vortex_samples(x_samples::Array,obs::AbstractObservationOperator;xlims=(-2,2),ylims=(-2,2),kwargs...)
+    f = Figure()
+    ax = f[1,1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y")
+    show_vortex_samples!(ax,x_samples,obs;kwargs...)
+    xlims!(ax,xlims...)
+    ylims!(ax,ylims...)
+    f
+end
+
+
+function plot_vorticity!(ax,μ,Σ,obs::AbstractObservationOperator;xlims = (-2.5,2.5),Nx = 201, ylims = (-2.5,2.5), Ny = 201)
+    xg = range(xlims...,length=Nx)
+    yg = range(ylims...,length=Ny)
+    w = [vorticity(x,y,μ,Σ,obs.config) for x in xg, y in yg]
+    contour!(ax,xg,yg,w)
+    xlims!(ax,xlims...)
+    ylims!(ax,ylims...)
+end
+
+"""
+        plot_vorticity(μ,Σ,obs::AbstractObservationOperator[;xlims=(-2.5,2.5),Nx = 201,ylims=(-2.5,2.5),Ny = 201])
+
+For a given mean state `μ` and state covariance `Σ`, calculate the expected value of the vorticity
+field on a grid. The optional arguments allow one to specify the dimensions of the grid.
+"""
+function plot_vorticity(μ,Σ,obs::AbstractObservationOperator; kwargs...)
+    f = Figure()
+    ax = f[1,1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y")
+    plot_vorticity!(ax,μ,Σ,obs;kwargs...)
+    f
+end
+
+function vortex_ellipses!(ax,μ,Σ,obs::AbstractObservationOperator; kwargs...)
+    for j = 1:obs.config.Nv
+        xidj, yidj, Γidj = get_vortex_ids(j,obs.config)
+        μxj = μ[[xidj,yidj]]
+        Σxxj = Σ[xidj:yidj,xidj:yidj]
+        xell, yell = draw_ellipse(μxj,Σxxj)
+        lines!(ax,xell,yell,color=:red,marker=:none)
+    end
+end
+
+"""
+    vortex_ellipses(μ,Σ,obs::AbstractObservationOperator)
+
+Given state mean `μ` and state covariance `Σ`, plot ellipses of uncertainty at each of the
+mean vortex locations in `μ`.
+"""
+function vortex_ellipses(μ,Σ,obs::AbstractObservationOperator; kwargs...)
+    f = Figure()
+    ax = f[1,1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y")
+    vortex_ellipses!(ax,μ,Σ,obs;kwargs...)
+    f
+end
+
+function plot_pressure_field!(ax,x::Vector,obs::PressureObservations;xlims=(-2.5,2.5),Nx=201,ylims=(-2.5,2.5),Ny=201,kwargs...)
+    xg = range(xlims...,length=Nx)
+    yg = range(ylims...,length=Ny)
+    zg = xg .+ im*yg'
+    vort = state_to_lagrange(x,obs.config;isblob=true)
+    p = analytical_pressure(zg,vort,obs.config)
+    plot_pressure_field!(ax,xg,yg,p,obs;kwargs...)
+end
+
+"""
+        plot_pressure_field(x::Vector,obs::PressureOperations[;xlims=(-2.5,2.5),Nx = 201,ylims=(-2.5,2.5),Ny = 201])
+
+For a given state `x`, calculate the pressure field on a grid. The optional arguments allow one to specify the dimensions of the grid.
+"""
+function plot_pressure_field(x::Vector,obs::PressureObservations; kwargs...)
+    f = Figure()
+    ax = f[1,1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y")
+    plot_pressure_field!(ax,x,obs;kwargs...)
+    f
+end
+
+function plot_pressure_field!(ax,xg::AbstractVector,yg::AbstractVector,p::Matrix,obs::AbstractObservationOperator; levels = range(-0.5,0.01,length=21), kwargs...)
+    contour!(ax,xg,yg,p,levels=levels,colormap=:RdBu)
+    plot_sensors!(ax,obs)
+end
+
+function plot_sensor_data!(ax,ystar::Vector,x::Vector,t::Real,obs::AbstractObservationOperator; sensor_noise=zero(ystar))
+    plot_sensor_data!(ax,ystar,obs;sensor_noise=sensor_noise)
+    y_est = observations(x,t,obs)
+    scatter!(ax,y_est,markersize=15,color=:transparent,strokewidth=1,label="estimate")
+end
+
+function plot_sensor_data!(ax,ystar::Vector,obs::AbstractObservationOperator; sensor_noise=zero(ystar))
+    scatter!(ax,ystar,markersize=10,color=:black,label="truth")
+    errorbars!(ax,1:length(ystar),ystar,sensor_noise)
+end
+
+"""
+    plot_sensor_data(ystar::Vector,obs::AbstractObservationOperator[; sensor_noise=zero(ystar)])
+
+Plot the sensor data in `ystar`.
+
+  plot_sensor_data(ystar::Vector,x::Vector,t,obs::AbstractObservationOperator[; sensor_noise=zero(ystar)])
+
+Compute the sensor data associated with state vector `x` at time `t` and plot it with the sensor data in `ystar`.
+"""
+function plot_sensor_data(a...; sensor_noise=zero(ystar))
+    f = Figure()
+    ax = f[1,1] = Axis(f;aspect=DataAspect(),xlabel="Sensor no.",ylabel="Sensor value")
+    plot_sensor_data!(ax,a...;sensor_noise=sensor_noise)
+    f
+end
+
+function plot_sensors!(ax,obs::PressureObservations)
+    scatter!(ax,real.(obs.sens),imag.(obs.sens),marker=:rect,color=:black)
+end
+
+function draw_ellipse(μ::Vector,Σ::AbstractMatrix)
+    θ = range(0,2π,length=100)
+    xc, yc = cos.(θ), sin.(θ)
+    sqrtΣ = sqrt(Σ)
+    xell = μ[1] .+ sqrtΣ[1,1]*xc .+ sqrtΣ[1,2]*yc
+    yell = μ[2] .+ sqrtΣ[2,1]*xc .+ sqrtΣ[2,2]*yc
+    return xell,yell
+end
+
+#=
 
 setmarkersize(x::Float64) = 5 + x*4
 
 
 function trajectory_theme()
-    MakieCore.Theme(
+    CairoMakie.Theme(
         fontsize=16,
         Axis=(xlabel=L"x", ylabel=L"y",limits=((-2,2),(-1,2)),aspect=1),
         resolution=(500,400)
@@ -35,19 +205,19 @@ function trajectory_theme()
 end
 
 
-MakieCore.@recipe(Trajectory, x, y) do scene
-    MakieCore.Attributes(
+CairoMakie.@recipe(Trajectory, x, y) do scene
+    CairoMakie.Attributes(
         color = :black
     )
 end
 
-MakieCore.@recipe(Trajectory3d, x, y, z) do scene
-    MakieCore.Attributes(
+CairoMakie.@recipe(Trajectory3d, x, y, z) do scene
+    CairoMakie.Attributes(
         color = :black
     )
 end
 
-function MakieCore.convert_arguments(P::Union{Type{<:LowRankVortex.Trajectory},Type{<:LowRankVortex.Trajectory3d}}, solhist::Vector{<:Any}, obs::AbstractObservationOperator)
+function CairoMakie.convert_arguments(P::Union{Type{<:LowRankVortex.Trajectory},Type{<:LowRankVortex.Trajectory3d}}, solhist::Vector{<:Any}, obs::AbstractObservationOperator)
     config = obs.config
     Nv = config.Nv
     x = [Float64[] for j in 1:Nv]
@@ -61,30 +231,15 @@ function MakieCore.convert_arguments(P::Union{Type{<:LowRankVortex.Trajectory},T
         push!(Γ[j],xt[3,j])
       end
     end
-    #=
-    for j in 1:Nv
-      zj = map(x -> state_to_positions_and_strengths(mean(x.Xf),config)[1][j],solhist)
-      xj, yj = real(zj), imag(zj)
-      push!(x,copy(xj))
-      push!(y,copy(yj))
-      Γj = map(x -> state_to_positions_and_strengths(mean(x.Xf),config)[2][j],solhist)
-      push!(Γ,copy(Γj))
-    end
-    =#
+
+
     return x,y,Γ
 end
 
-function draw_ellipse(μ::Vector,Σ::AbstractMatrix)
-    θ = range(0,2π,length=100)
-    xc, yc = cos.(θ), sin.(θ)
-    sqrtΣ = sqrt(Σ)
-    xell = μ[1] .+ sqrtΣ[1,1]*xc .+ sqrtΣ[1,2]*yc
-    yell = μ[2] .+ sqrtΣ[2,1]*xc .+ sqrtΣ[2,2]*yc
-    return xell,yell
-end
 
 
-function MakieCore.plot!(trajectory::Trajectory)
+
+function CairoMakie.plot!(trajectory::Trajectory)
     x,y = trajectory[:x], trajectory[:y]
     for j in eachindex(x.val)
       xj, yj = x.val[j], y.val[j]
@@ -101,7 +256,7 @@ end
 
 
 
-function MakieCore.plot!(trajectory::Trajectory3d)
+function CairoMakie.plot!(trajectory::Trajectory3d)
     x,y,z = trajectory[:x], trajectory[:y], trajectory[:z]
     l1 = lines!(trajectory,x,y,z,color=trajectory[:color])
     l2 = scatter!(trajectory,[x.val[1]],[y.val[1]],[z.val[1]])
@@ -112,6 +267,8 @@ function MakieCore.plot!(trajectory::Trajectory3d)
     l3 = scatter!(trajectory,[x.val[end]],[y.val[end]],[z.val[end]],color=l1.attributes[:color])
     trajectory
 end
+
+=#
 
 #=
 @userplot Filtertrajectory
