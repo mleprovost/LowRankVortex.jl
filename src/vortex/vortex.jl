@@ -1,7 +1,7 @@
 export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_state_mapping,
           state_to_positions_and_strengths, positions_and_strengths_to_state,
           state_to_vortex_states, states_to_vortex_states, state_covariance,
-          number_of_vortices, vorticity
+          number_of_vortices, vorticity, get_vortex_ids
 
 
 abstract type ImageType end
@@ -357,6 +357,36 @@ states_to_vortex_states(state_array::BasicEnsembleMatrix, config::VortexConfig) 
 vortex_position_to_phys_space(zj,config::VortexConfig) = zj
 vortex_position_to_phys_space(zj,config::VortexConfig{Body}) = Elements.conftransform(zj,config.body)
 
+"""
+    get_vortex_ids(v,config) -> Tuple{Int}
+
+Return the global position and strength IDs in the state vector as
+a tuple of 3 integers (e.g. xid, yid, Γid)
+"""
+function get_vortex_ids(v::Integer,config::VortexConfig)
+  @unpack Nv, state_id = config
+
+  @assert v <= Nv && v > 0
+
+  x_ids = state_id["vortex x"]
+  y_ids = state_id["vortex y"]
+  Γ_ids = state_id["vortex Γ"]
+
+  return x_ids[v], y_ids[v], Γ_ids[v]
+end
+
+function get_vortex_ids(v::Integer,config::VortexConfig{Body})
+  @unpack Nv, state_id = config
+
+  @assert v <= Nv && v > 0
+
+  logr_ids = state_id["vortex logr"]
+  rϴ_ids = state_id["vortex rΘ"]
+  Γ_ids = state_id["vortex Γ"]
+
+  return logr_ids[v], rϴ_ids[v], Γ_ids[v]
+end
+
 
 """
     vorticity(x,y,μ::AbstactVector,Σ::AbstractMatrix,config::VortexConfig)
@@ -364,29 +394,28 @@ vortex_position_to_phys_space(zj,config::VortexConfig{Body}) = Elements.conftran
 Evaluate the vorticity at point x,y, given the mean state vector `μ` and uncertainty matrix `Σ`
 """
 function vorticity(x,y,μ::Vector,Σ::AbstractMatrix,config::VortexConfig)
-    @unpack Nv, state_id = config
+    @unpack Nv = config
 
-    x_ids = state_id["vortex x"]
-    y_ids = state_id["vortex y"]
-    Γ_ids = state_id["vortex Γ"]
+    #x_ids = state_id["vortex x"]
+    #y_ids = state_id["vortex y"]
+    #Γ_ids = state_id["vortex Γ"]
     xvec = [x,y]
     w = 0.0
     for j = 1:Nv
-        xidj, yidj, Γidj = x_ids[j], y_ids[j], Γ_ids[j]
+        #xidj, yidj, Γidj = x_ids[j], y_ids[j], Γ_ids[j]
+        xidj, yidj, Γidj = get_vortex_ids(j,config)
         μxj = μ[[xidj,yidj]]
         Σxxj = Σ[xidj:yidj,xidj:yidj]
         ΣΓxj = Σ[xidj:yidj,Γidj]
         μΓj = μ[Γidj]
-        wj = vorticity(xvec,μxj,μΓj,Σxxj,ΣΓxj)
-        #wj = exp(-0.5*xvec'*inv(Σxxj)*xvec)
-        #wj *= (μΓj + ΣΓxj'*inv(Σxxj)*xvec)
+        wj = _vorticity(xvec,μxj,μΓj,Σxxj,ΣΓxj)
         w += wj
     end
     return w
 end
 
 
-function vorticity(xvec::Vector, μx, μΓ, Σxx, ΣΓx)
+function _vorticity(xvec, μx, μΓ, Σxx, ΣΓx)
     xvec_rel = xvec .- μx
     w = exp(-0.5*xvec_rel'*inv(Σxx)*xvec_rel)
     w *= (μΓ + ΣΓx'*inv(Σxx)*xvec_rel)

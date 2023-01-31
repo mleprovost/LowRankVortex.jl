@@ -1,6 +1,7 @@
 using Clustering
+using GaussianMixtures
 
-export classify_by_data_mismatch, classify_by_density
+export classify_by_data_mismatch, classify_by_density, classify_by_gmm
 
 """
     classify_by_data_mismatch(collection::Vector{Vector{AbstractENKFSolution}},obs::AbstractObservationOperator[;kluster=5,min_cluster_size=1,cluster_choice=nothing])
@@ -77,3 +78,17 @@ function classify_by_density(sol_collection::Vector{Vector{T}},obs::AbstractObse
   return member_indices
 
 end
+
+
+"""
+    classify_by_gmm(K::Int,x_samples)
+
+For state ensemble array `x_samples`, create a GMM model with `K` components
+"""
+function classify_by_gmm(K::Int,x_samples::Array;nIter=30)
+    x_fulldata = zero(transpose(x_samples))
+    x_fulldata .= transpose(x_samples)
+    gm = GaussianMixtures.GMM(K,x_fulldata,kind=:full,method=:kmeans,nIter=nIter)
+end
+
+classify_by_gmm(K,x::BasicEnsembleMatrix;kwargs...) = classify_by_gmm(K,x.X;kwargs...)

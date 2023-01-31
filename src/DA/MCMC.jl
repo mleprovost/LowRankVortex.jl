@@ -59,9 +59,13 @@ function metropolis(zi::Vector{Vector{T}},nsamp::Integer,logp̃::Function,propva
     # Burn-in period. Don't collect data
     for j = 1:nchain
         z = copy(zi[j])
+        accept = false
         for i in 1:burnin-1
             z, accept = mhstep(z,logp̃,propvars[j],β[j])
         end
+        z_data[j][:,1] = copy(z)
+        accept_data[j][1] = accept
+        logp_data[j][1] = β[j]*logp̃(z)
     end
     for i in 2:nsamp-burnin+1
       for j = 1:nchain
