@@ -62,6 +62,7 @@ function metropolis(zi::Vector{Vector{T}},nsamp::Integer,logp̃::Function,propva
         accept = false
         for i in 1:burnin-1
             z, accept = mhstep(z,logp̃,propvars[j],β[j])
+            z = process_state(z)
         end
         z_data[j][:,1] = copy(z)
         accept_data[j][1] = accept

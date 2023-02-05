@@ -1,6 +1,6 @@
 export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_state_mapping,
           state_to_positions_and_strengths, positions_and_strengths_to_state,
-          state_to_vortex_states, states_to_vortex_states, state_covariance,
+          state_to_vortex_states, states_to_vortex_states, state_covariance,create_state_bounds,
           number_of_vortices, vorticity, get_vortex_ids
 
 
@@ -289,6 +289,12 @@ function positions_and_strengths_to_state(ζv::AbstractVector{ComplexF64},Γv::A
   return state
 end
 
+"""
+    state_covariance(varx, vary, varΓ, config::VortexConfig)
+
+Create a state covariance matrix with variances `varx`, `vary` and `varΓ`
+for the x, y, and strength entries for every vortex.
+"""
 function state_covariance(varx, vary, varΓ, config::VortexConfig)
   @unpack Nv, state_id = config
 
@@ -303,6 +309,30 @@ function state_covariance(varx, vary, varΓ, config::VortexConfig)
     Σx_diag[Γ_ids[j]] = varΓ
   end
   return Diagonal(Σx_diag)
+end
+
+"""
+    create_state_bounds(xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig)
+
+Create a vector of tuples (of length equal to the state vector) containing the
+bounds of each type of vector component.
+"""
+function create_state_bounds(xr,yr,Γr,config::VortexConfig)
+    @unpack Nv, state_id = config
+
+    bounds = [(-Inf,Inf) for i in 1:state_length(config)]
+
+    x_ids = state_id["vortex x"]
+    y_ids = state_id["vortex y"]
+    Γ_ids = state_id["vortex Γ"]
+
+    for j = 1:Nv
+      bounds[x_ids[j]] = xr
+      bounds[y_ids[j]] = yr
+      bounds[Γ_ids[j]] = Γr
+    end
+
+    return bounds
 end
 
 ### OTHER WAYS OF DECOMPOSING STATES ###

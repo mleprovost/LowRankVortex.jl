@@ -5,7 +5,7 @@
 # Nx is number of states, Ny is number of observations
 
 export observations!, observations, AbstractObservationOperator, jacob!,
-       state_filter!, normal_loglikelihood
+       state_filter!, normal_loglikelihood, log_uniform
 
 abstract type AbstractObservationOperator{Nx,Ny,withsensors} end
 
@@ -25,6 +25,23 @@ function normal_loglikelihood(x,t,ystar,Σϵ,obs::AbstractObservationOperator)
     #loss = norm(ystar-y .- mean(ystar-y),Σϵ)
     loss = norm(ystar-y,Σϵ)
     return -loss^2/2
+end
+
+"""
+    log_uniform(x,bounds)
+
+Given state vector `x` and bounds vector `bounds`, return
+the log of the scaled uniform probability of `x` relative to the
+bounds. It returns -Inf if `x` is outside the bounds and 0 if `x` is inside
+or on the bounds.
+"""
+function log_uniform(x::Vector,bounds::Vector{<:Tuple})
+    logp = 0.0
+    for i in eachindex(x)
+        a, b = bounds[i]
+        logp += log((a<=x[i]<=b)*1.0)
+    end
+    return logp
 end
 
 """
