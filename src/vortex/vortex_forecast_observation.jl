@@ -366,7 +366,7 @@ This function would typically be used before and after the analysis step to enfo
 state_filter!(x, obs::PressureObservations) = flip_symmetry_state_filter!(x, obs.config)
 
 
-function flip_symmetry_state_filter!(x::Vector, config::VortexConfig)
+function flip_symmetry_state_filter!(x, config::VortexConfig)
 	@unpack Nv, state_id = config
 
 	x_ids = state_id["vortex x"]
@@ -384,7 +384,7 @@ function flip_symmetry_state_filter!(x::Vector, config::VortexConfig)
 	x[Γ_ids] = x[Γ_ids[id_sort]]
 
 	# Make all y locations positive
-	x[y_ids] = abs.(x[y_ids])
+	#x[y_ids] = abs.(x[y_ids])
 
   return x
 end
