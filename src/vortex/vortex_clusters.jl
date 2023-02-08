@@ -67,8 +67,7 @@ createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx,σΓ;bod
 function _createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx,σΓ,each_cluster_radius,b)
     #zc, Γc = pointcluster(Nclusters,z0,Γ0,σcx,σcΓ;circle_radius=cluster_circle_radius)
     zc = random_points_plane(Nclusters,xr...,yr...)
-    Γmin, Γmax = Γr
-    Γc = Γmin .+ (Γmax-Γmin)*rand(Nclusters)
+    Γc = random_strengths(Nclusters,Γr...)
 
     zp = ComplexF64[]
     Γp = Float64[]
@@ -97,8 +96,7 @@ first distributed on a circle of that radius before being perturbed.
 function _createclusters(Nclusters,Npercluster,rr::Tuple,Θr::Tuple,Γr::Tuple,σx,σΓ,each_cluster_radius,b::Bodies.ConformalBody)
     #zc, Γc = pointcluster(Nclusters,z0,Γ0,σcx,σcΓ;circle_radius=cluster_circle_radius)
     zc = random_points_unit_circle(Nclusters,rr,Θr)
-    Γmin, Γmax = Γr
-    Γc = Γmin .+ (Γmax-Γmin)*rand(Nclusters)
+    Γc = random_strengths(Nclusters,Γr...)
 
     zp = ComplexF64[]
     Γp = Float64[]
@@ -180,3 +178,9 @@ function _random_radial_points_unit_circle(N,rmedian::Float64,r4sig::Float64)
 end
 
 _random_radial_points_unit_circle(rmedian,r4sig) = first(_random_points_unit_circle(1,rmedian,r4sig))
+
+function random_strengths(N,Γmin,Γmax)
+  @assert Γmax > Γmin "Γmax must be larger than Γmin"
+  Γ = Γmin .+ (Γmax-Γmin)*rand(N)
+  return Γ
+end
