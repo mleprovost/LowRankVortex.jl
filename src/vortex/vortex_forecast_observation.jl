@@ -347,13 +347,20 @@ function symmetry_state_filter!(x, config::VortexConfig)
 
 	y_ids = state_id["vortex y"]
 	Γ_ids = state_id["vortex Γ"]
+	Tmat = state_id["vortex Γ transform"]
+	inv_Tmat = state_id["vortex Γ inverse transform"]
+
+	state_Γ = x[Γ_ids]
+	Γv = inv_Tmat*state_Γ
 
 	@inbounds for j=1:Nv
 		# Ensure that vortices stay above the x axis
 		x[y_ids[j]] = clamp(x[y_ids[j]], 1e-2, Inf)
 		# Ensure that the circulation remains positive
-    x[Γ_ids[j]] = clamp(x[Γ_ids[j]], 0.0, Inf)
+    Γv[j] = clamp(Γv[j], 0.0, Inf)
 	end
+	x[Γ_ids] = Tmat*Γv
+
   return x
 end
 
@@ -365,7 +372,7 @@ This function would typically be used before and after the analysis step to enfo
 """
 state_filter!(x, obs::PressureObservations) = flip_symmetry_state_filter!(x, obs.config)
 
-
+# This only works if the vortex strength transform is the identity
 function flip_symmetry_state_filter!(x, config::VortexConfig)
 	@unpack Nv, state_id = config
 
@@ -373,6 +380,7 @@ function flip_symmetry_state_filter!(x, config::VortexConfig)
 	y_ids = state_id["vortex y"]
 	Γ_ids = state_id["vortex Γ"]
 
+	#=
 	# Flip the sign of vorticity if it is negative on average
 	Γtot = sum(x[Γ_ids])
 	x[Γ_ids] = Γtot < 0 ? -x[Γ_ids] : x[Γ_ids]
@@ -382,6 +390,7 @@ function flip_symmetry_state_filter!(x, config::VortexConfig)
 	x[x_ids] = x[x_ids[id_sort]]
 	x[y_ids] = x[y_ids[id_sort]]
 	x[Γ_ids] = x[Γ_ids[id_sort]]
+	=#
 
 	# Make all y locations positive
 	#x[y_ids] = abs.(x[y_ids])

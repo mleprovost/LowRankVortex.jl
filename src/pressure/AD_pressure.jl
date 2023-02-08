@@ -29,5 +29,8 @@ function AD_symmetric_jacobian_pressure(target, source, t)
 	J[:, y_ids] .= -2*imag.(dpdz)
 	J[:, Γ_ids] .= real.(dpdΓ)
 
+	inv_T = state_id["vortex Γ inverse transform"]
+	J[:,Γ_ids] = J[:,Γ_ids]*inv_T
+
 	return J
 end
