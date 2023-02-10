@@ -615,6 +615,9 @@ function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, targe
   		J[:, Γ_ids[L]] .=  2*imag.(view(dpd,:,L))
 	end
 
+  inv_T = state_id["vortex Γ inverse transform"]
+	J[:,Γ_ids] = J[:,Γ_ids]*inv_T
+
 	return J
 end
 
@@ -704,6 +707,9 @@ function analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, Cts, ∂Cs
 	@inbounds for L in idx
 		J[:, Γ_ids[L]] .=  2*imag.(view(dpd,:,L))
 	end
+
+  inv_T = state_id["vortex Γ inverse transform"]
+	J[:,Γ_ids] = J[:,Γ_ids]*inv_T
 
     return J
 end

@@ -5,7 +5,7 @@ using LaTeXStrings
 using CairoMakie
 
 export color_palette
-export draw_ellipse
+export draw_ellipse!
 export data_histogram, show_vortices, show_vortices!, show_vortex_samples,
         show_vortex_samples!, plot_vorticity, plot_vorticity!, vortex_ellipses,
         vortex_ellipses!, plot_pressure_field, plot_pressure_field!, plot_sensor_data,
@@ -58,33 +58,46 @@ function show_vortices(x::Vector,obs::AbstractObservationOperator;kwargs...)
 end
 
 
-function show_vortex_samples!(ax,x_samples::Array,obs::AbstractObservationOperator;kwargs...)
-    vort_array = states_to_vortex_states(x_samples,obs.config)
-    scatter!(ax,vort_array[1,:],vort_array[2,:],markersize=1,label="sample")
+function show_vortex_samples!(ax,x_samples::Array,obs::AbstractObservationOperator;nskip=1,kwargs...)
+    vort_array = states_to_vortex_states(x_samples[:,1:nskip:end],obs.config)
+    sgns = sign.(vort_array[3,:])
+    scatter!(ax,vort_array[1,:],vort_array[2,:];markersize=1.5,color=sgns,label="sample",kwargs...)
 
 end
 
 """
-    show_vortex_samples(x_samples,obs)
+    show_vortex_samples(x_samples,obs[;nskip=1])
 
 Plot the samples of an ensemble of states as a scatter plot of vortex positions. Note that
-`x_samples` must be of size Nstate x Ne.
+`x_samples` must be of size Nstate x Ne. Use `nskip` to plot every `nskip` state.
 """
-function show_vortex_samples(x_samples::Array,obs::AbstractObservationOperator;xlims=(-2,2),ylims=(-2,2),kwargs...)
+function show_vortex_samples(x_samples::Array,obs::AbstractObservationOperator;nskip=1,xlims=(-2,2),ylims=(-2,2),kwargs...)
     f = Figure()
     ax = f[1,1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y")
-    show_vortex_samples!(ax,x_samples,obs;kwargs...)
+    show_vortex_samples!(ax,x_samples,obs;nskip=nskip,kwargs...)
     xlims!(ax,xlims...)
     ylims!(ax,ylims...)
     f
 end
 
 
-function plot_vorticity!(ax,μ,Σ,obs::AbstractObservationOperator;xlims = (-2.5,2.5),Nx = 201, ylims = (-2.5,2.5), Ny = 201)
+function plot_vorticity!(ax,μ::Vector,Σ,obs::AbstractObservationOperator;xlims = (-2.5,2.5),Nx = 201, ylims = (-2.5,2.5), Ny = 201,kwargs...)
     xg = range(xlims...,length=Nx)
     yg = range(ylims...,length=Ny)
     w = [vorticity(x,y,μ,Σ,obs.config) for x in xg, y in yg]
-    contour!(ax,xg,yg,w)
+    contour!(ax,xg,yg,w;kwargs...)
+    xlims!(ax,xlims...)
+    ylims!(ax,ylims...)
+end
+
+function plot_vorticity!(ax,μ::AbstractMatrix,Σ,wts,obs::AbstractObservationOperator;xlims = (-2.5,2.5),Nx = 201, ylims = (-2.5,2.5), Ny = 201,kwargs...)
+    xg = range(xlims...,length=Nx)
+    yg = range(ylims...,length=Ny)
+    w = zeros(Nx,Ny)
+    for c in 1:size(μ,2)
+      w .+= [wts[c]*vorticity(x,y,μ[:,c],Σ[c],obs.config) for x in xg, y in yg]
+    end
+    contour!(ax,xg,yg,w;kwargs...)
     xlims!(ax,xlims...)
     ylims!(ax,ylims...)
 end
@@ -102,15 +115,23 @@ function plot_vorticity(μ,Σ,obs::AbstractObservationOperator; kwargs...)
     f
 end
 
-function vortex_ellipses!(ax,μ,Σ,obs::AbstractObservationOperator; kwargs...)
+function vortex_ellipses!(ax,μ::Vector{T},Σ,obs::AbstractObservationOperator; kwargs...) where {T<:Real}
     for j = 1:obs.config.Nv
         xidj, yidj, Γidj = get_vortex_ids(j,obs.config)
         μxj = μ[[xidj,yidj]]
         Σxxj = Σ[xidj:yidj,xidj:yidj]
-        xell, yell = draw_ellipse(μxj,Σxxj)
-        lines!(ax,xell,yell,color=:red,marker=:none)
+        draw_ellipse!(ax,μxj,Σxxj;kwargs...)
     end
 end
+
+function vortex_ellipses!(ax,μ::AbstractMatrix{T},Σ,wts,obs::AbstractObservationOperator; kwargs...) where {T<:Real}
+  id_sort = sortperm(wts,rev=true)
+  for c in 1:size(μ,2)
+      id = id_sort[c]
+      vortex_ellipses!(ax,μ[:,id],Σ[id],obs;color=Cycled(c),linewidth=1.5wts[id]^2/maximum(wts.^2),kwargs...)
+  end
+end
+
 
 """
     vortex_ellipses(μ,Σ,obs::AbstractObservationOperator)
@@ -178,17 +199,17 @@ function plot_sensor_data(a...; sensor_noise=zero(ystar))
     f
 end
 
-function plot_sensors!(ax,obs::PressureObservations)
-    scatter!(ax,real.(obs.sens),imag.(obs.sens),marker=:rect,color=:black)
+function plot_sensors!(ax,obs::PressureObservations;kwargs...)
+    scatter!(ax,real.(obs.sens),imag.(obs.sens);marker=:rect,color=:black,kwargs...)
 end
 
-function draw_ellipse(μ::Vector,Σ::AbstractMatrix)
+function draw_ellipse!(ax,μ::Vector,Σ::AbstractMatrix;kwargs...)
     θ = range(0,2π,length=100)
     xc, yc = cos.(θ), sin.(θ)
     sqrtΣ = sqrt(Σ)
     xell = μ[1] .+ sqrtΣ[1,1]*xc .+ sqrtΣ[1,2]*yc
     yell = μ[2] .+ sqrtΣ[2,1]*xc .+ sqrtΣ[2,2]*yc
-    return xell,yell
+    lines!(ax,xell,yell;marker=:none,kwargs...)
 end
 
 #=

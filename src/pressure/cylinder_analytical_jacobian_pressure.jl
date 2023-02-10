@@ -30,6 +30,9 @@ function cylinder_analytical_jacobian_pressure!(J, target::Vector{ComplexF64}, s
 		J[:,Γ_ids[i]] .= dpdΓi
 	end
 
+	inv_T = state_id["vortex Γ inverse transform"]
+	J[:,Γ_ids] = J[:,Γ_ids]*inv_T
+
 	return J
 end
 

@@ -36,13 +36,34 @@ Generate a random state, taking the parameters for the vortices from the ranges
 `xr`, `yr`, `Γr`.
 """
 function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig)
-    zv_prior, Γv_prior = createclusters(config.Nv,1,xr,yr,Γr,0.0,0.0;body=config.body)
-    vort_prior = Vortex.Blob.(zv_prior,Γv_prior,config.δ)
-    return lagrange_to_state(vort_prior,config)
+    @unpack Nv = config
+    zv_prior = random_points_plane(Nv,xr...,yr...)
+    Γv_prior = random_strengths(Nv,Γr...)
+    return positions_and_strengths_to_state(zv_prior,Γv_prior,config)
 end
 
-generate_random_states(nstates,xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig) =
-    [generate_random_state(xr,yr,Γr,config) for i in 1:nstates]
+function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig{Body})
+    @unpack Nv = config
+    zv_prior = random_points_unit_circle(Nv,rr,Θr)
+    Γv_prior = random_strengths(Nv,Γr...)
+    return positions_and_strengths_to_state(zv_prior,Γv_prior,config)
+end
+
+function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,Γtotr::Tuple,config::VortexConfig)
+    @unpack Nv = config
+    zv_prior = random_points_plane(Nv,xr...,yr...)
+    Γv_prior = random_strengths(Nv,Γr...,Γtotr...)
+    return positions_and_strengths_to_state(zv_prior,Γv_prior,config)
+end
+
+function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,Γtotr::Tuple,config::VortexConfig{Body})
+    @unpack Nv = config
+    zv_prior = random_points_unit_circle(Nv,rr,Θr)
+    Γv_prior = random_strengths(Nv,Γr...,Γtotr...)
+    return positions_and_strengths_to_state(zv_prior,Γv_prior,config)
+end
+
+generate_random_states(nstates,a...) = [generate_random_state(a...) for i in 1:nstates]
 
 
 """
@@ -67,8 +88,7 @@ createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx,σΓ;bod
 function _createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx,σΓ,each_cluster_radius,b)
     #zc, Γc = pointcluster(Nclusters,z0,Γ0,σcx,σcΓ;circle_radius=cluster_circle_radius)
     zc = random_points_plane(Nclusters,xr...,yr...)
-    Γmin, Γmax = Γr
-    Γc = Γmin .+ (Γmax-Γmin)*rand(Nclusters)
+    Γc = random_strengths(Nclusters,Γr...)
 
     zp = ComplexF64[]
     Γp = Float64[]
@@ -97,8 +117,7 @@ first distributed on a circle of that radius before being perturbed.
 function _createclusters(Nclusters,Npercluster,rr::Tuple,Θr::Tuple,Γr::Tuple,σx,σΓ,each_cluster_radius,b::Bodies.ConformalBody)
     #zc, Γc = pointcluster(Nclusters,z0,Γ0,σcx,σcΓ;circle_radius=cluster_circle_radius)
     zc = random_points_unit_circle(Nclusters,rr,Θr)
-    Γmin, Γmax = Γr
-    Γc = Γmin .+ (Γmax-Γmin)*rand(Nclusters)
+    Γc = random_strengths(Nclusters,Γr...)
 
     zp = ComplexF64[]
     Γp = Float64[]
@@ -180,3 +199,24 @@ function _random_radial_points_unit_circle(N,rmedian::Float64,r4sig::Float64)
 end
 
 _random_radial_points_unit_circle(rmedian,r4sig) = first(_random_points_unit_circle(1,rmedian,r4sig))
+
+function random_strengths(N,Γmin,Γmax)
+  @assert Γmax > Γmin "Γmax must be larger than Γmin"
+  Γ = Γmin .+ (Γmax-Γmin)*rand(N)
+  return Γ
+end
+
+function random_strengths(N,dΓmin,dΓmax,Γtotmin,Γtotmax)
+  @assert dΓmax > dΓmin "dΓmax must be larger than dΓmin"
+  @assert Γtotmax > Γtotmin "Γtotmax must be larger than Γtotmin"
+
+  Tmat = _strength_transform_matrix_sum(N)
+  inv_Tmat = inv(Tmat)
+
+  Γ = zeros(N)
+  Γ[1] = Γtotmin .+ (Γtotmax-Γtotmin)*rand()
+  Γ[2:end] = dΓmin .+ (dΓmax-dΓmin)*rand(N-1)
+  Γ = inv_Tmat*Γ
+
+  return Γ
+end

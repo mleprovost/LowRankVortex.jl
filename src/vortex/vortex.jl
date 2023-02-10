@@ -1,6 +1,6 @@
 export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_state_mapping,
           state_to_positions_and_strengths, positions_and_strengths_to_state,
-          state_to_vortex_states, states_to_vortex_states, state_covariance,
+          state_to_vortex_states, states_to_vortex_states, state_covariance,create_state_bounds,
           number_of_vortices, vorticity, get_vortex_ids
 
 
@@ -89,6 +89,18 @@ function construct_state_mapping(Nv::Int64)
   state_id["vortex y"] = vortex_y_ids
   state_id["vortex Γ"] = vortex_Γ_ids
 
+  state_id["vortex Γ total"] = vortex_Γ_ids[1]
+
+  # Create the strength transform matrix
+  #  T maps actual strengths to states
+  #  inv T maps states to actual strengths
+  Tmat = _strength_transform_matrix_identity(Nv)
+  #Tmat = _strength_transform_matrix_sum(Nv)
+
+
+  state_id["vortex Γ transform"] = Tmat
+  state_id["vortex Γ inverse transform"] = inv(Tmat)
+
   return state_id
 end
 
@@ -106,7 +118,34 @@ function construct_state_mapping_conformal(Nv::Int64)
   state_id["vortex rΘ"] = vortex_rΘ_ids
   state_id["vortex Γ"] = vortex_Γ_ids
 
+  state_id["vortex Γ total"] = vortex_Γ_ids[1]
+
+  Tmat = _strength_transform_matrix_identity(Nv)
+  #Tmat = _strength_transform_matrix_sum(Nv)
+
+
+  state_id["vortex Γ transform"] = Tmat
+  state_id["vortex Γ inverse transform"] = inv(T)
+
   return state_id
+end
+
+function _strength_transform_matrix_sum(Nv)
+  T = zeros(Float64,Nv,Nv)
+  T[1,:] .= 1.0
+  for j = 2:Nv
+    T[j,j-1] = 1.0
+    T[j,j] = -1.0
+  end
+  return T
+end
+
+function _strength_transform_matrix_identity(Nv)
+  T = zeros(Float64,Nv,Nv)
+  for j = 1:Nv
+    T[j,j] = 1.0
+  end
+  return T
 end
 
 """
@@ -118,6 +157,8 @@ state_length(config::VortexConfig) =  state_length(config.state_id)
 
 state_length(a::Dict) = mapreduce(key -> state_length(a[key]),+,keys(a))
 state_length(a::Vector) = length(a)
+state_length(a::Matrix) = 0
+state_length(a::Int) = 0
 
 
 number_of_vortices(config::VortexConfig) = config.Nv
@@ -182,12 +223,16 @@ function lagrange_to_state(source::Vector{T}, config::VortexConfig; withcylinder
     y_ids = state_id["vortex y"]
     Γ_ids = state_id["vortex Γ"]
 
+    Tmat = state_id["vortex Γ transform"]
+
     for i=1:Nv
         bi = source[i]
         states[x_ids[i]] = real(bi.z)
         states[y_ids[i]] = imag(bi.z)
         states[Γ_ids[i]] =  circulation(bi)
     end
+
+    states[Γ_ids] = Tmat*states[Γ_ids]
 
     return states
 end
@@ -203,6 +248,8 @@ function lagrange_to_state(source::Vector{T}, config::VortexConfig{Body}) where 
     rϴ_ids = state_id["vortex rΘ"]
     Γ_ids = state_id["vortex Γ"]
 
+    Tmat =state_id["vortex Γ transform"]
+
     for i=1:Nv
         bi = source[i]
         zi = Elements.position(bi)
@@ -211,6 +258,8 @@ function lagrange_to_state(source::Vector{T}, config::VortexConfig{Body}) where 
         states[rϴ_ids[i]] = ri*Θi
         states[Γ_ids[i]] =  strength(bi)
     end
+
+    states[Γ_ids] = Tmat*states[Γ_ids]
 
     return states
 end
@@ -230,6 +279,8 @@ function state_to_positions_and_strengths(state::AbstractVector{Float64}, config
   rϴ_ids = state_id["vortex rΘ"]
   Γ_ids = state_id["vortex Γ"]
 
+  inv_Tmat =state_id["vortex Γ inverse transform"]
+
   ζv = zeros(ComplexF64,Nv)
   Γv = zeros(Float64,Nv)
   for i in 1:Nv
@@ -238,6 +289,8 @@ function state_to_positions_and_strengths(state::AbstractVector{Float64}, config
     ζv[i] = rv*exp(im*Θv)
     Γv[i] = state[Γ_ids[i]]
   end
+  Γv = inv_Tmat*Γv
+
   return ζv, Γv
 end
 
@@ -247,9 +300,12 @@ function state_to_positions_and_strengths(state::AbstractVector{Float64}, config
   x_ids = state_id["vortex x"]
   y_ids = state_id["vortex y"]
   Γ_ids = state_id["vortex Γ"]
+  inv_Tmat = state_id["vortex Γ inverse transform"]
 
   zv = [state[x_ids[i]] + im*state[y_ids[i]] for i in 1:Nv]
   Γv = [state[Γ_ids[i]] for i in 1:Nv]
+
+  Γv = inv_Tmat*Γv
 
   return zv, Γv
 end
@@ -261,11 +317,14 @@ function positions_and_strengths_to_state(zv::AbstractVector{ComplexF64},Γv::Ab
   x_ids = state_id["vortex x"]
   y_ids = state_id["vortex y"]
   Γ_ids = state_id["vortex Γ"]
+  Tmat = state_id["vortex Γ transform"]
+
+  Γv_transform = Tmat*Γv
 
   for i = 1:Nv
     state[x_ids[i]] = real(zv[i])
     state[y_ids[i]] = imag(zv[i])
-    state[Γ_ids[i]] = Γv[i]
+    state[Γ_ids[i]] = Γv_transform[i]
   end
   return state
 end
@@ -278,23 +337,33 @@ function positions_and_strengths_to_state(ζv::AbstractVector{ComplexF64},Γv::A
   logr_ids = state_id["vortex logr"]
   rϴ_ids = state_id["vortex rΘ"]
   Γ_ids = state_id["vortex Γ"]
+  Tmat = state_id["vortex Γ transform"]
+
+  Γv_transform = Tmat*Γv
 
   for i = 1:Nv
     ri = abs(ζv[i])
     Θi = angle(ζv[i])
     state[logr_ids[i]] = log(ri-1.0)
     state[rϴ_ids[i]] = ri*Θi
-    state[Γ_ids[i]] =  Γv[i]
+    state[Γ_ids[i]] =  Γv_transform[i]
   end
   return state
 end
 
-function state_covariance(varx, vary, varΓ, config::VortexConfig)
+"""
+    state_covariance(varx, vary, varΓ, config::VortexConfig; varΓtot=varΓ)
+
+Create a state covariance matrix with variances `varx`, `vary` and `varΓ`
+for the x, y, and strength entries for every vortex.
+"""
+function state_covariance(varx, vary, varΓ, config::VortexConfig; varΓtot=varΓ)
   @unpack Nv, state_id = config
 
   x_ids = state_id["vortex x"]
   y_ids = state_id["vortex y"]
   Γ_ids = state_id["vortex Γ"]
+  Γtot_id = state_id["vortex Γ total"]
 
   Σx_diag = zeros(Float64,state_length(config))
   for j = 1:Nv
@@ -302,7 +371,36 @@ function state_covariance(varx, vary, varΓ, config::VortexConfig)
     Σx_diag[y_ids[j]] = vary
     Σx_diag[Γ_ids[j]] = varΓ
   end
+  Σx_diag[Γtot_id] = varΓtot
+
   return Diagonal(Σx_diag)
+end
+
+"""
+    create_state_bounds(xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig[;Γtotr = Γr])
+
+Create a vector of tuples (of length equal to the state vector) containing the
+bounds of each type of vector component.
+"""
+function create_state_bounds(xr,yr,Γr,config::VortexConfig;Γtotr = Γr)
+    @unpack Nv, state_id = config
+
+    bounds = [(-Inf,Inf) for i in 1:state_length(config)]
+
+    x_ids = state_id["vortex x"]
+    y_ids = state_id["vortex y"]
+    Γ_ids = state_id["vortex Γ"]
+
+    Γtot_id = state_id["vortex Γ total"]
+
+    for j = 1:Nv
+      bounds[x_ids[j]] = xr
+      bounds[y_ids[j]] = yr
+      bounds[Γ_ids[j]] = Γr
+    end
+    bounds[Γtot_id] = Γtotr
+
+    return bounds
 end
 
 ### OTHER WAYS OF DECOMPOSING STATES ###
@@ -394,20 +492,34 @@ end
 Evaluate the vorticity at point x,y, given the mean state vector `μ` and uncertainty matrix `Σ`
 """
 function vorticity(x,y,μ::Vector,Σ::AbstractMatrix,config::VortexConfig)
-    @unpack Nv = config
+    @unpack Nv, state_id = config
 
-    #x_ids = state_id["vortex x"]
-    #y_ids = state_id["vortex y"]
-    #Γ_ids = state_id["vortex Γ"]
+    x_ids = state_id["vortex x"]
+    y_ids = state_id["vortex y"]
+    Γ_ids = state_id["vortex Γ"]
+
+    inv_Tmat = state_id["vortex Γ inverse transform"]
+    μ_trans = copy(μ)
+    μ_trans[Γ_ids] =  inv_Tmat*μ_trans[Γ_ids]
+
+    Σ_trans = copy(Σ)
+    Σ_trans[x_ids,Γ_ids] = Σ_trans[x_ids,Γ_ids]*inv_Tmat
+    Σ_trans[y_ids,Γ_ids] = Σ_trans[y_ids,Γ_ids]*inv_Tmat
+    Σ_trans[Γ_ids,x_ids] = inv_Tmat'*Σ_trans[Γ_ids,x_ids]
+    Σ_trans[Γ_ids,y_ids] = inv_Tmat'*Σ_trans[Γ_ids,y_ids]
+    Σ_trans[Γ_ids,Γ_ids] = inv_Tmat'*Σ_trans[Γ_ids,Γ_ids]*inv_Tmat
+
+
+
     xvec = [x,y]
     w = 0.0
     for j = 1:Nv
         #xidj, yidj, Γidj = x_ids[j], y_ids[j], Γ_ids[j]
         xidj, yidj, Γidj = get_vortex_ids(j,config)
-        μxj = μ[[xidj,yidj]]
-        Σxxj = Σ[xidj:yidj,xidj:yidj]
-        ΣΓxj = Σ[xidj:yidj,Γidj]
-        μΓj = μ[Γidj]
+        μxj = μ_trans[[xidj,yidj]]
+        Σxxj = Σ_trans[xidj:yidj,xidj:yidj]
+        ΣΓxj = Σ_trans[xidj:yidj,Γidj]
+        μΓj = μ_trans[Γidj]
         wj = _vorticity(xvec,μxj,μΓj,Σxxj,ΣΓxj)
         w += wj
     end

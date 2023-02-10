@@ -897,6 +897,9 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpdz, dpdS, Css, Ct
 		J[:, Γ_ids[L]] .=  2*imag.(view(dpdS,:,L))
 	end
 
+  inv_T = state_id["vortex Γ inverse transform"]
+	J[:,Γ_ids] = J[:,Γ_ids]*inv_T
+
 	return J
 
 end
@@ -1071,6 +1074,9 @@ function symmetric_analytical_jacobian_pressure!(J, wtarget, dpd, dpdstar, Css, 
 
 	# Vortices
 	J[:, Γ_ids] .= 2imag.(dpd[:,1:Nv])
+  
+  inv_T = state_id["vortex Γ inverse transform"]
+	J[:,Γ_ids] = J[:,Γ_ids]*inv_T
 
 	return J
 end

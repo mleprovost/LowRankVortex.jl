@@ -33,6 +33,9 @@ function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, s
 		J[:,Γ_ids[i]] .= dpdΓi
 	end
 
+	inv_T = state_id["vortex Γ inverse transform"]
+	J[:,Γ_ids] = J[:,Γ_ids]*inv_T
+
 	return J
 end
 
@@ -47,6 +50,7 @@ function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, s
   y_ids = state_id["vortex y"]
   Γ_ids = state_id["vortex Γ"]
 
+
 	# dpdzi = zeros(ComplexF64, Ny)
 	# dpdΓi = zeros(Ny)
 
@@ -58,6 +62,9 @@ function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, s
 		dpdΓi = analytical_dpdΓv(target, i, source; kwargs...)
 		J[:,Γ_ids[i]] .= dpdΓi
 	end
+
+	inv_T = state_id["vortex Γ inverse transform"]
+	J[:,Γ_ids] = J[:,Γ_ids]*inv_T
 
 	return J
 end
@@ -85,6 +92,9 @@ function analytical_force_jacobian!(J,source::Vector{T}, b::Bodies.ConformalBody
 		dfdΓi = analytical_dfdΓv(i, source, b; kwargs...)
 		J[:,Γ_ids[i]] .= dfdΓi
 	end
+
+	inv_T = state_id["vortex Γ inverse transform"]
+	J[:,Γ_ids] = J[:,Γ_ids]*inv_T
 
 	return J
 end
