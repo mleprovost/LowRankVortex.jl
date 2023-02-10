@@ -94,8 +94,8 @@ function construct_state_mapping(Nv::Int64)
   # Create the strength transform matrix
   #  T maps actual strengths to states
   #  inv T maps states to actual strengths
-  #Tmat = _strength_transform_matrix_identity(Nv)
-  Tmat = _strength_transform_matrix_sum(Nv)
+  Tmat = _strength_transform_matrix_identity(Nv)
+  #Tmat = _strength_transform_matrix_sum(Nv)
 
 
   state_id["vortex Γ transform"] = Tmat
@@ -120,8 +120,8 @@ function construct_state_mapping_conformal(Nv::Int64)
 
   state_id["vortex Γ total"] = vortex_Γ_ids[1]
 
-  #Tmat = _strength_transform_matrix_identity(Nv)
-  Tmat = _strength_transform_matrix_sum(Nv)
+  Tmat = _strength_transform_matrix_identity(Nv)
+  #Tmat = _strength_transform_matrix_sum(Nv)
 
 
   state_id["vortex Γ transform"] = Tmat

@@ -380,17 +380,18 @@ function flip_symmetry_state_filter!(x, config::VortexConfig)
 	y_ids = state_id["vortex y"]
 	Γ_ids = state_id["vortex Γ"]
 
-	#=
+
 	# Flip the sign of vorticity if it is negative on average
 	Γtot = sum(x[Γ_ids])
-	x[Γ_ids] = Γtot < 0 ? -x[Γ_ids] : x[Γ_ids]
+	x[Γ_ids] .= Γtot < 0 ? -x[Γ_ids] : x[Γ_ids]
+
 
 	# Sort the vortices by strength to try to ensure they don't take each other's role
 	id_sort = sortperm(x[Γ_ids])
-	x[x_ids] = x[x_ids[id_sort]]
-	x[y_ids] = x[y_ids[id_sort]]
-	x[Γ_ids] = x[Γ_ids[id_sort]]
-	=#
+	x[x_ids] .= x[x_ids[id_sort]]
+	x[y_ids] .= x[y_ids[id_sort]]
+	x[Γ_ids] .= x[Γ_ids[id_sort]]
+
 
 	# Make all y locations positive
 	#x[y_ids] = abs.(x[y_ids])
@@ -398,6 +399,48 @@ function flip_symmetry_state_filter!(x, config::VortexConfig)
   return x
 end
 
+function align_vector_through_flips(μ::AbstractVector,Σ::AbstractMatrix,μref::AbstractVector,Σref::AbstractMatrix,config::VortexConfig)
+    @unpack Nv, state_id = config
+
+    x_ids = state_id["vortex x"]
+    y_ids = state_id["vortex y"]
+    Γ_ids = state_id["vortex Γ"]
+
+		xv, yv = μref[x_ids], μref[y_ids]
+
+		wvec_ref = map((x,y) -> vorticity(x,y,μref,Σref,config),xv,yv)
+
+		max_cos = -Inf
+
+		wvec = map((x,y) -> vorticity(x,y,μ,Σ,config),xv,yv)
+		plus_cos = wvec'*wvec_ref
+
+		μ_minus = copy(μ)
+		Σ_minus = copy(Σ)
+
+		μ_minus[Γ_ids] = -μ_minus[Γ_ids]
+		Σ_minus[x_ids,Γ_ids] = -Σ_minus[x_ids,Γ_ids]
+		Σ_minus[y_ids,Γ_ids] = -Σ_minus[y_ids,Γ_ids]
+		Σ_minus[Γ_ids,x_ids] = -Σ_minus[Γ_ids,x_ids]
+		Σ_minus[Γ_ids,y_ids] = -Σ_minus[Γ_ids,y_ids]
+
+		wvec = map((x,y) -> vorticity(x,y,μ_minus,Σ,config),xv,yv)
+		minus_cos = wvec'*wvec_ref
+
+		μ_max = plus_cos > minus_cos ? μ : μ_minus
+		Σ_max = plus_cos > minus_cos ? Σ : Σ_minus
+
+    return μ_max, Σ_max
+end
+
+function align_vector_through_flips!(X::AbstractMatrix,Σ::Vector,refcol,config::VortexConfig)
+    for c in eachindex(Σ)
+        xnew, Σnew = align_vector_through_flips(X[:,c],Σ[c],X[:,refcol],Σ[refcol],config)
+        X[:,c] .= xnew
+				Σ[c] .= Σnew
+    end
+    return X, Σ
+end
 
 # Localization
 function dobsobs(obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx,Ny}
