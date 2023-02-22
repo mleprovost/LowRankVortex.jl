@@ -2,11 +2,11 @@ export create_random_vortices, generate_random_state, generate_random_states,
           createclusters, pointcluster, vortexmoment
 
 
-function vortexmoment(mom::Int,zv::AbstractVector,Γv::AbstractVector)
-    @assert length(zv) == length(Γv) "Inconsistent lengths of vectors"
+function vortexmoment(mom::Int,zv::AbstractVector,strengthv::AbstractVector)
+    @assert length(zv) == length(strengthv) "Inconsistent lengths of vectors"
     sum = complex(0.0)
     for j in 1:length(zv)
-      sum += Γv[j]*zv[j]^mom
+      sum += strengthv[j]*zv[j]^mom
     end
     return sum
 end
@@ -35,32 +35,32 @@ end
 Generate a random state, taking the parameters for the vortices from the ranges
 `xr`, `yr`, `Γr`.
 """
-function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig)
-    @unpack Nv = config
+function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,config::SingularityConfig)
+    Nv = number_of_singularities(config)
     zv_prior = random_points_plane(Nv,xr...,yr...)
-    Γv_prior = random_strengths(Nv,Γr...)
-    return positions_and_strengths_to_state(zv_prior,Γv_prior,config)
+    strengthv_prior = random_strengths(Nv,Γr...)
+    return positions_and_strengths_to_state(zv_prior,strengthv_prior,config)
 end
 
 function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig{Body})
-    @unpack Nv = config
+    Nv = number_of_singularities(config)
     zv_prior = random_points_unit_circle(Nv,rr,Θr)
-    Γv_prior = random_strengths(Nv,Γr...)
-    return positions_and_strengths_to_state(zv_prior,Γv_prior,config)
+    strengthv_prior = random_strengths(Nv,Γr...)
+    return positions_and_strengths_to_state(zv_prior,strengthv_prior,config)
 end
 
-function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,Γtotr::Tuple,config::VortexConfig)
+function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,Γtotr::Tuple,config::SingularityConfig)
     @unpack Nv = config
     zv_prior = random_points_plane(Nv,xr...,yr...)
-    Γv_prior = random_strengths(Nv,Γr...,Γtotr...)
-    return positions_and_strengths_to_state(zv_prior,Γv_prior,config)
+    strengthv_prior = random_strengths(Nv,Γr...,Γtotr...)
+    return positions_and_strengths_to_state(zv_prior,strengthv_prior,config)
 end
 
 function generate_random_state(xr::Tuple,yr::Tuple,Γr::Tuple,Γtotr::Tuple,config::VortexConfig{Body})
     @unpack Nv = config
     zv_prior = random_points_unit_circle(Nv,rr,Θr)
-    Γv_prior = random_strengths(Nv,Γr...,Γtotr...)
-    return positions_and_strengths_to_state(zv_prior,Γv_prior,config)
+    strengthv_prior = random_strengths(Nv,Γr...,Γtotr...)
+    return positions_and_strengths_to_state(zv_prior,strengthv_prior,config)
 end
 
 generate_random_states(nstates,a...) = [generate_random_state(a...) for i in 1:nstates]
