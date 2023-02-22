@@ -1,7 +1,7 @@
-export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_state_mapping,
+export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_vortex_state_mapping,
           state_to_positions_and_strengths, positions_and_strengths_to_state,
-          state_to_vortex_states, states_to_vortex_states, state_covariance,create_state_bounds,
-          number_of_vortices, vorticity, get_vortex_ids
+          state_to_singularity_states, states_to_singularity_states, state_covariance,create_state_bounds,
+          number_of_singularities, vorticity, get_singularity_ids
 
 
 abstract type ImageType end
@@ -31,7 +31,7 @@ A structure to hold the parameters of the vortex simulations
 - `δ::Float64` : blob radius
 - `advect_flag::Bool`: true if the vortex system should be advected
 """
-struct VortexConfig{WT,BT,SID}
+struct VortexConfig{WT,BT,SID} <: SingularityConfig
 
     "Number of vortices"
     Nv::Int64
@@ -57,12 +57,12 @@ struct VortexConfig{WT,BT,SID}
 end
 
 function VortexConfig(Nv,U,Δt,δ;advect_flag=true,body=nothing)
-  state_id = construct_state_mapping(Nv,body)
+  state_id = construct_vortex_state_mapping(Nv,body)
   VortexConfig{_walltype(body),typeof(body),typeof(state_id)}(Nv,state_id,body,U,Δt,δ,advect_flag)
 end
 
 function VortexConfig(Nv,δ;body=nothing)
-  state_id = construct_state_mapping(Nv,body)
+  state_id = construct_vortex_state_mapping(Nv,body)
   VortexConfig{_walltype(body),typeof(body),typeof(state_id)}(Nv,state_id,body,complex(0.0),0.0,δ,false)
 end
 
@@ -71,11 +71,11 @@ _walltype(body) = body
 
 
 # Mapping from vortex elements and other degrees of freedom to the state components
-construct_state_mapping(Nv,body) = construct_state_mapping(Nv)
-construct_state_mapping(Nv,::Bodies.ConformalBody) = construct_state_mapping_conformal(Nv)
+construct_vortex_state_mapping(Nv,body) = construct_vortex_state_mapping(Nv)
+construct_vortex_state_mapping(Nv,::Bodies.ConformalBody) = construct_vortex_state_mapping_conformal(Nv)
 
 
-function construct_state_mapping(Nv::Int64)
+function construct_vortex_state_mapping(Nv::Int64)
   state_id = Dict()
   vortex_x_ids = zeros(Int,Nv)
   vortex_y_ids = zeros(Int,Nv)
@@ -104,7 +104,7 @@ function construct_state_mapping(Nv::Int64)
   return state_id
 end
 
-function construct_state_mapping_conformal(Nv::Int64)
+function construct_vortex_state_mapping_conformal(Nv::Int64)
   state_id = Dict()
   vortex_logr_ids = zeros(Int,Nv)
   vortex_rΘ_ids = zeros(Int,Nv)
@@ -149,11 +149,11 @@ function _strength_transform_matrix_identity(Nv)
 end
 
 """
-    state_length(config::VortexConfig)
+    state_length(config::AbstractConfig)
 
 Return the number of components of the state vector
 """
-state_length(config::VortexConfig) =  state_length(config.state_id)
+state_length(config::AbstractConfig) =  state_length(config.state_id)
 
 state_length(a::Dict) = mapreduce(key -> state_length(a[key]),+,keys(a))
 state_length(a::Vector) = length(a)
@@ -161,7 +161,7 @@ state_length(a::Matrix) = 0
 state_length(a::Int) = 0
 
 
-number_of_vortices(config::VortexConfig) = config.Nv
+number_of_singularities(config::VortexConfig) = config.Nv
 
 
 "A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).
@@ -377,13 +377,14 @@ function state_covariance(varx, vary, varΓ, config::VortexConfig; varΓtot=var�
 end
 
 """
-    create_state_bounds(xr::Tuple,yr::Tuple,Γr::Tuple,config::VortexConfig[;Γtotr = Γr])
+    create_state_bounds(xr::Tuple,yr::Tuple,strengthr::Tuple,config::SingularityConfig[;Γtotr = Γr])
 
 Create a vector of tuples (of length equal to the state vector) containing the
 bounds of each type of vector component.
 """
-function create_state_bounds(xr,yr,Γr,config::VortexConfig;Γtotr = Γr)
-    @unpack Nv, state_id = config
+function create_state_bounds(xr,yr,strengthr,config::VortexConfig;strtotr = strengthr)
+    @unpack state_id = config
+    N = number_of_singularities(config)
 
     bounds = [(-Inf,Inf) for i in 1:state_length(config)]
 
@@ -393,12 +394,12 @@ function create_state_bounds(xr,yr,Γr,config::VortexConfig;Γtotr = Γr)
 
     Γtot_id = state_id["vortex Γ total"]
 
-    for j = 1:Nv
+    for j = 1:N
       bounds[x_ids[j]] = xr
       bounds[y_ids[j]] = yr
-      bounds[Γ_ids[j]] = Γr
+      bounds[Γ_ids[j]] = strengthr
     end
-    bounds[Γtot_id] = Γtotr
+    bounds[Γtot_id] = strtotr
 
     return bounds
 end
@@ -407,62 +408,89 @@ end
 
 
 """
-    states_to_vortex_states(state_array::Matrix,config::VortexConfig)
+    states_to_singularity_states(state_array::Matrix,config::AbstractConfig)
 
 Take an array of states (length(state) x nstates) and convert it to a (3 x Nv*nstates) array
-of individual vortex states.
+of individual singularity states.
 """
-function states_to_vortex_states(state_array::AbstractMatrix{Float64}, config::VortexConfig)
-   Nv = number_of_vortices(config)
+function states_to_singularity_states(state_array::AbstractMatrix{Float64}, config::SingularityConfig)
+   Ns = number_of_singularities(config)
    ndim, nstates = size(state_array)
-   vortex_array = zeros(3,Nv*nstates)
+   sing_array = zeros(3,Ns*nstates)
    for j in 1:nstates
-     vortexstatej = state_to_vortex_states(state_array[:,j],config)
-     vortex_array[:,(j-1)*Nv+1:j*Nv] = vortexstatej
+     singstatej = state_to_singularity_states(state_array[:,j],config)
+     sing_array[:,(j-1)*Ns+1:j*Ns] = singstatej
    end
-   return vortex_array
+   return sing_array
 end
 
 
 """
-    index_of_vortex_state(v::Integer,config::VortexConfig)
+    index_of_singularity_state(v::Integer,config::VortexConfig)
 
 Return the column of a (length(state) x nstates) array of states
-that a single vortex of index `v` in a (3 x Nv*nstates) vortex state array belongs to.
+that a single singularity of index `v` in a (3 x Nv*nstates) singularity state array belongs to.
 """
-index_of_vortex_state(v::Int,config::VortexConfig) = (v-1)÷number_of_vortices(config)+1
+index_of_singularity_state(v::Int,config::AbstractConfig) = (v-1)÷number_of_singularities(config)+1
 
 """
-    state_to_vortex_states(state::AbstractVector,config::VortexConfig)
+    state_to_singularity_states(state::AbstractVector,config::VortexConfig)
 
-Given a state `state`, return a 3 x Nv array of the vortex states.
+Given a state `state`, return a 3 x Nv array of the singularity states.
 """
-function state_to_vortex_states(state::AbstractVector{Float64}, config::VortexConfig)
-    @unpack Nv = config
-    zv, Γv = state_to_positions_and_strengths(state,config)
+function state_to_singularity_states(state::AbstractVector{Float64}, config::SingularityConfig)
+    Nv = number_of_singularities(config)
+    zv, strengthv = state_to_positions_and_strengths(state,config)
     xarray = zeros(3,Nv)
     for v in 1:Nv
-        zv_v = vortex_position_to_phys_space(zv[v],config)
-        xarray[:,v] .= [real(zv_v),imag(zv_v),Γv[v]]
+        zv_v = singularity_position_to_phys_space(zv[v],config)
+        xarray[:,v] .= [real(zv_v),imag(zv_v),strengthv[v]]
         #push!(xarray,[real(zv[v]),imag(zv[v]),Γv[v]])
     end
     return xarray
 end
 
-states_to_vortex_states(state_array::BasicEnsembleMatrix, config::VortexConfig) =
-    states_to_vortex_states(state_array.X,config)
+state_to_singularity_states(state_array::BasicEnsembleMatrix, config::VortexConfig) =
+    state_to_singularity_states(state_array.X,config)
 
-vortex_position_to_phys_space(zj,config::VortexConfig) = zj
-vortex_position_to_phys_space(zj,config::VortexConfig{Body}) = Elements.conftransform(zj,config.body)
+singularity_position_to_phys_space(zj,config::SingularityConfig) = zj
+singularity_position_to_phys_space(zj,config::VortexConfig{Body}) = Elements.conftransform(zj,config.body)
 
 """
-    get_vortex_ids(v,config) -> Tuple{Int}
+    get_singularity_ids(config) -> Tuple{Int}
 
 Return the global position and strength IDs in the state vector as
 a tuple of 3 integers (e.g. xid, yid, Γid)
 """
-function get_vortex_ids(v::Integer,config::VortexConfig)
-  @unpack Nv, state_id = config
+function get_singularity_ids(config::VortexConfig)
+  @unpack state_id = config
+
+  x_ids = state_id["vortex x"]
+  y_ids = state_id["vortex y"]
+  Γ_ids = state_id["vortex Γ"]
+
+  return x_ids, y_ids, Γ_ids
+end
+
+function get_singularity_ids(config::VortexConfig{Body})
+  @unpack state_id = config
+
+  logr_ids = state_id["vortex logr"]
+  rϴ_ids = state_id["vortex rΘ"]
+  Γ_ids = state_id["vortex Γ"]
+
+  return logr_ids, rϴ_ids, Γ_ids
+end
+
+"""
+    get_singularity_ids(v,config) -> Tuple{Int}
+
+Return the global position and strength IDs in the state vector as
+a tuple of 3 integers (e.g. xid, yid, Γid)
+"""
+function get_singularity_ids(v::Integer,config::VortexConfig)
+  @unpack state_id = config
+  Nv = number_of_singularities(config)
 
   @assert v <= Nv && v > 0
 
@@ -473,8 +501,9 @@ function get_vortex_ids(v::Integer,config::VortexConfig)
   return x_ids[v], y_ids[v], Γ_ids[v]
 end
 
-function get_vortex_ids(v::Integer,config::VortexConfig{Body})
-  @unpack Nv, state_id = config
+function get_singularity_ids(v::Integer,config::VortexConfig{Body})
+  @unpack state_id = config
+  Nv = number_of_singularities(config)
 
   @assert v <= Nv && v > 0
 
@@ -485,51 +514,51 @@ function get_vortex_ids(v::Integer,config::VortexConfig{Body})
   return logr_ids[v], rϴ_ids[v], Γ_ids[v]
 end
 
+get_inverse_strength_transform(config::VortexConfig) = config.state_id["vortex Γ inverse transform"]
+
 
 """
-    vorticity(x,y,μ::AbstactVector,Σ::AbstractMatrix,config::VortexConfig)
+    blobfield(x,y,μ::AbstactVector,Σ::AbstractMatrix,config::VortexConfig)
 
-Evaluate the vorticity at point x,y, given the mean state vector `μ` and uncertainty matrix `Σ`
+Evaluate the blobfield at point x,y, given the mean state vector `μ` and uncertainty matrix `Σ`
 """
-function vorticity(x,y,μ::Vector,Σ::AbstractMatrix,config::VortexConfig)
-    @unpack Nv, state_id = config
+function blobfield(x,y,μ::Vector,Σ::AbstractMatrix,config::SingularityConfig)
+    @unpack state_id = config
+    Nv = number_of_singularities(config)
 
-    x_ids = state_id["vortex x"]
-    y_ids = state_id["vortex y"]
-    Γ_ids = state_id["vortex Γ"]
+    x_ids, y_ids, strength_ids = get_singularity_ids(config)
 
-    inv_Tmat = state_id["vortex Γ inverse transform"]
+    inv_Tmat = get_inverse_strength_transform(config)
     μ_trans = copy(μ)
-    μ_trans[Γ_ids] =  inv_Tmat*μ_trans[Γ_ids]
+    μ_trans[strength_ids] =  inv_Tmat*μ_trans[strength_ids]
 
     Σ_trans = copy(Σ)
-    Σ_trans[x_ids,Γ_ids] = Σ_trans[x_ids,Γ_ids]*inv_Tmat
-    Σ_trans[y_ids,Γ_ids] = Σ_trans[y_ids,Γ_ids]*inv_Tmat
-    Σ_trans[Γ_ids,x_ids] = inv_Tmat'*Σ_trans[Γ_ids,x_ids]
-    Σ_trans[Γ_ids,y_ids] = inv_Tmat'*Σ_trans[Γ_ids,y_ids]
-    Σ_trans[Γ_ids,Γ_ids] = inv_Tmat'*Σ_trans[Γ_ids,Γ_ids]*inv_Tmat
+    Σ_trans[x_ids,strength_ids] = Σ_trans[x_ids,strength_ids]*inv_Tmat
+    Σ_trans[y_ids,strength_ids] = Σ_trans[y_ids,strength_ids]*inv_Tmat
+    Σ_trans[strength_ids,x_ids] = inv_Tmat'*Σ_trans[strength_ids,x_ids]
+    Σ_trans[strength_ids,y_ids] = inv_Tmat'*Σ_trans[strength_ids,y_ids]
+    Σ_trans[strength_ids,strength_ids] = inv_Tmat'*Σ_trans[strength_ids,strength_ids]*inv_Tmat
 
 
 
     xvec = [x,y]
     w = 0.0
     for j = 1:Nv
-        #xidj, yidj, Γidj = x_ids[j], y_ids[j], Γ_ids[j]
-        xidj, yidj, Γidj = get_vortex_ids(j,config)
+        xidj, yidj, strengthidj = get_singularity_ids(j,config)
         μxj = μ_trans[[xidj,yidj]]
         Σxxj = Σ_trans[xidj:yidj,xidj:yidj]
-        ΣΓxj = Σ_trans[xidj:yidj,Γidj]
-        μΓj = μ_trans[Γidj]
-        wj = _vorticity(xvec,μxj,μΓj,Σxxj,ΣΓxj)
+        Σstrengthxj = Σ_trans[xidj:yidj,strengthidj]
+        μstrengthj = μ_trans[strengthidj]
+        wj = _blobfield(xvec,μxj,μstrengthj,Σxxj,Σstrengthxj)
         w += wj
     end
     return w
 end
 
 
-function _vorticity(xvec, μx, μΓ, Σxx, ΣΓx)
+function _blobfield(xvec, μx, μstrength, Σxx, Σstrengthx)
     xvec_rel = xvec .- μx
     w = exp(-0.5*xvec_rel'*inv(Σxx)*xvec_rel)
-    w *= (μΓ + ΣΓx'*inv(Σxx)*xvec_rel)
+    w *= (μstrength + Σstrengthx'*inv(Σxx)*xvec_rel)
     return w
 end

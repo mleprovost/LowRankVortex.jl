@@ -6,9 +6,10 @@ using CairoMakie
 
 export color_palette
 export draw_ellipse!
-export data_histogram, show_vortices, show_vortices!, show_vortex_samples,
-        show_vortex_samples!, plot_vorticity, plot_vorticity!, vortex_ellipses,
-        vortex_ellipses!, plot_pressure_field, plot_pressure_field!, plot_sensor_data,
+export data_histogram, show_singularities, show_singularities!, show_singularity_samples,
+        show_singularity_samples!, plot_expected_sourcefield, plot_expected_sourcefield!, singularity_ellipses,
+        singularity_ellipses!, plot_pressure_field, plot_pressure_field!,
+        plot_potential_field, plot_potential_field!, plot_sensor_data,
         plot_sensor_data!, plot_sensors!
 
 """
@@ -40,62 +41,65 @@ function data_histogram(x::Vector{T};bins=80,xlims = (-2,2), kwargs...) where {T
 end
 
 
-function show_vortices!(ax,x::Vector,obs::AbstractObservationOperator)
-    vort_array = state_to_vortex_states(x,obs.config)
-    scatter!(ax,vort_array[1,:],vort_array[2,:])
+function show_singularities!(ax,x::Vector,obs::AbstractObservationOperator)
+    sing_array = state_to_singularity_states(x,obs.config)
+    scatter!(ax,sing_array[1,:],sing_array[2,:])
 end
 
 """
-    show_vortices(x::Vector,obs::AbstractObservationOperator)
+    show_singularities(x::Vector,obs::AbstractObservationOperator)
 
-Given state vector `x`, create a plot that depicts the vortex positions.
+Given state vector `x`, create a plot that depicts the singularity positions.
 """
-function show_vortices(x::Vector,obs::AbstractObservationOperator;kwargs...)
+function show_singularities(x::Vector,obs::AbstractObservationOperator;kwargs...)
     f = Figure()
     ax = f[1, 1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y",kwargs...)
-    show_vortices!(ax,x,obs)
+    show_singularities!(ax,x,obs)
     f
 end
 
 
-function show_vortex_samples!(ax,x_samples::Array,obs::AbstractObservationOperator;nskip=1,kwargs...)
-    vort_array = states_to_vortex_states(x_samples[:,1:nskip:end],obs.config)
-    sgns = sign.(vort_array[3,:])
-    scatter!(ax,vort_array[1,:],vort_array[2,:];markersize=1.5,color=sgns,label="sample",kwargs...)
+function show_singularity_samples!(ax,x_samples::Array,obs::AbstractObservationOperator;nskip=1,kwargs...)
+    sing_array = states_to_singularity_states(x_samples[:,1:nskip:end],obs.config)
+    sgns = sign.(sing_array[3,:])
+    bluered = range(colorant"lightsalmon",colorant"lightskyblue1",length=2)
+    colormap = cgrad(bluered,0.25,categorical=true)
+
+    scatter!(ax,sing_array[1,:],sing_array[2,:];markersize=1.5,colormap=colormap,color=sgns,label="sample",kwargs...)
 
 end
 
 """
-    show_vortex_samples(x_samples,obs[;nskip=1])
+    show_singularity_samples(x_samples,obs[;nskip=1])
 
-Plot the samples of an ensemble of states as a scatter plot of vortex positions. Note that
+Plot the samples of an ensemble of states as a scatter plot of singularity positions. Note that
 `x_samples` must be of size Nstate x Ne. Use `nskip` to plot every `nskip` state.
 """
-function show_vortex_samples(x_samples::Array,obs::AbstractObservationOperator;nskip=1,xlims=(-2,2),ylims=(-2,2),kwargs...)
+function show_singularity_samples(x_samples::Array,obs::AbstractObservationOperator;nskip=1,xlims=(-2,2),ylims=(-2,2),kwargs...)
     f = Figure()
     ax = f[1,1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y")
-    show_vortex_samples!(ax,x_samples,obs;nskip=nskip,kwargs...)
+    show_singularity_samples!(ax,x_samples,obs;nskip=nskip,kwargs...)
     xlims!(ax,xlims...)
     ylims!(ax,ylims...)
     f
 end
 
 
-function plot_vorticity!(ax,μ::Vector,Σ,obs::AbstractObservationOperator;xlims = (-2.5,2.5),Nx = 201, ylims = (-2.5,2.5), Ny = 201,kwargs...)
+function plot_expected_sourcefield!(ax,μ::Vector,Σ,obs::AbstractObservationOperator;xlims = (-2.5,2.5),Nx = 201, ylims = (-2.5,2.5), Ny = 201,kwargs...)
     xg = range(xlims...,length=Nx)
     yg = range(ylims...,length=Ny)
-    w = [vorticity(x,y,μ,Σ,obs.config) for x in xg, y in yg]
+    w = [blobfield(x,y,μ,Σ,obs.config) for x in xg, y in yg]
     contour!(ax,xg,yg,w;kwargs...)
     xlims!(ax,xlims...)
     ylims!(ax,ylims...)
 end
 
-function plot_vorticity!(ax,μ::AbstractMatrix,Σ,wts,obs::AbstractObservationOperator;xlims = (-2.5,2.5),Nx = 201, ylims = (-2.5,2.5), Ny = 201,kwargs...)
+function plot_expected_sourcefield!(ax,μ::AbstractMatrix,Σ,wts,obs::AbstractObservationOperator;xlims = (-2.5,2.5),Nx = 201, ylims = (-2.5,2.5), Ny = 201,kwargs...)
     xg = range(xlims...,length=Nx)
     yg = range(ylims...,length=Ny)
     w = zeros(Nx,Ny)
     for c in 1:size(μ,2)
-      w .+= [wts[c]*vorticity(x,y,μ[:,c],Σ[c],obs.config) for x in xg, y in yg]
+      w .+= [wts[c]*blobfield(x,y,μ[:,c],Σ[c],obs.config) for x in xg, y in yg]
     end
     contour!(ax,xg,yg,w;kwargs...)
     xlims!(ax,xlims...)
@@ -103,46 +107,47 @@ function plot_vorticity!(ax,μ::AbstractMatrix,Σ,wts,obs::AbstractObservationOp
 end
 
 """
-        plot_vorticity(μ,Σ,obs::AbstractObservationOperator[;xlims=(-2.5,2.5),Nx = 201,ylims=(-2.5,2.5),Ny = 201])
+        plot_expected_sourcefield(μ,Σ,obs::AbstractObservationOperator[;xlims=(-2.5,2.5),Nx = 201,ylims=(-2.5,2.5),Ny = 201])
 
 For a given mean state `μ` and state covariance `Σ`, calculate the expected value of the vorticity
 field on a grid. The optional arguments allow one to specify the dimensions of the grid.
 """
-function plot_vorticity(μ,Σ,obs::AbstractObservationOperator; kwargs...)
+function plot_expected_sourcefield(μ,Σ,obs::AbstractObservationOperator; kwargs...)
     f = Figure()
     ax = f[1,1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y")
-    plot_vorticity!(ax,μ,Σ,obs;kwargs...)
+    plot_expected_sourcefield!(ax,μ,Σ,obs;kwargs...)
     f
 end
 
-function vortex_ellipses!(ax,μ::Vector{T},Σ,obs::AbstractObservationOperator; kwargs...) where {T<:Real}
-    for j = 1:obs.config.Nv
-        xidj, yidj, Γidj = get_vortex_ids(j,obs.config)
+function singularity_ellipses!(ax,μ::Vector{T},Σ,obs::AbstractObservationOperator; kwargs...) where {T<:Real}
+    N = number_of_singularities(obs.config)
+    for j = 1:N
+        xidj, yidj, Γidj = get_singularity_ids(j,obs.config)
         μxj = μ[[xidj,yidj]]
         Σxxj = Σ[xidj:yidj,xidj:yidj]
         draw_ellipse!(ax,μxj,Σxxj;kwargs...)
     end
 end
 
-function vortex_ellipses!(ax,μ::AbstractMatrix{T},Σ,wts,obs::AbstractObservationOperator; kwargs...) where {T<:Real}
+function singularity_ellipses!(ax,μ::AbstractMatrix{T},Σ,wts,obs::AbstractObservationOperator; kwargs...) where {T<:Real}
   id_sort = sortperm(wts,rev=true)
   for c in 1:size(μ,2)
       id = id_sort[c]
-      vortex_ellipses!(ax,μ[:,id],Σ[id],obs;color=Cycled(c),linewidth=1.5wts[id]^2/maximum(wts.^2),kwargs...)
+      singularity_ellipses!(ax,μ[:,id],Σ[id],obs;color=Cycled(c),linewidth=1.5wts[id]^2/maximum(wts.^2),kwargs...)
   end
 end
 
 
 """
-    vortex_ellipses(μ,Σ,obs::AbstractObservationOperator)
+    singularity_ellipses(μ,Σ,obs::AbstractObservationOperator)
 
 Given state mean `μ` and state covariance `Σ`, plot ellipses of uncertainty at each of the
-mean vortex locations in `μ`.
+mean singularity locations in `μ`.
 """
-function vortex_ellipses(μ,Σ,obs::AbstractObservationOperator; kwargs...)
+function singularity_ellipses(μ,Σ,obs::AbstractObservationOperator; kwargs...)
     f = Figure()
     ax = f[1,1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y")
-    vortex_ellipses!(ax,μ,Σ,obs;kwargs...)
+    singularity_ellipses!(ax,μ,Σ,obs;kwargs...)
     f
 end
 
@@ -155,8 +160,17 @@ function plot_pressure_field!(ax,x::Vector,obs::PressureObservations;xlims=(-2.5
     plot_pressure_field!(ax,xg,yg,p,obs;kwargs...)
 end
 
+function plot_potential_field!(ax,x::Vector,obs::PotentialObservations;xlims=(-2.5,2.5),Nx=201,ylims=(-2.5,2.5),Ny=201,kwargs...)
+    xg = range(xlims...,length=Nx)
+    yg = range(ylims...,length=Ny)
+    zg = xg .+ im*yg'
+    vort = state_to_lagrange(x,obs.config;isblob=true)
+    p = analytical_potential(zg,vort,obs.config)
+    plot_potential_field!(ax,xg,yg,p,obs;kwargs...)
+end
+
 """
-        plot_pressure_field(x::Vector,obs::PressureOperations[;xlims=(-2.5,2.5),Nx = 201,ylims=(-2.5,2.5),Ny = 201])
+        plot_pressure_field(x::Vector,obs::PressureObservations[;xlims=(-2.5,2.5),Nx = 201,ylims=(-2.5,2.5),Ny = 201])
 
 For a given state `x`, calculate the pressure field on a grid. The optional arguments allow one to specify the dimensions of the grid.
 """
@@ -167,7 +181,24 @@ function plot_pressure_field(x::Vector,obs::PressureObservations; kwargs...)
     f
 end
 
+"""
+        plot_potential_field(x::Vector,obs::PotentialObservations[;xlims=(-2.5,2.5),Nx = 201,ylims=(-2.5,2.5),Ny = 201])
+
+For a given state `x`, calculate the pressure field on a grid. The optional arguments allow one to specify the dimensions of the grid.
+"""
+function plot_potential_field(x::Vector,obs::PotentialObservations; kwargs...)
+    f = Figure()
+    ax = f[1,1] = Axis(f;aspect=DataAspect(),xlabel=L"x",ylabel=L"y")
+    plot_potential_field!(ax,x,obs;kwargs...)
+    f
+end
+
 function plot_pressure_field!(ax,xg::AbstractVector,yg::AbstractVector,p::Matrix,obs::AbstractObservationOperator; levels = range(-0.5,0.01,length=21), kwargs...)
+    contour!(ax,xg,yg,p,levels=levels,colormap=:RdBu)
+    plot_sensors!(ax,obs)
+end
+
+function plot_potential_field!(ax,xg::AbstractVector,yg::AbstractVector,p::Matrix,obs::AbstractObservationOperator; levels = range(-0.5,0.01,length=21), kwargs...)
     contour!(ax,xg,yg,p,levels=levels,colormap=:RdBu)
     plot_sensors!(ax,obs)
 end
@@ -199,7 +230,7 @@ function plot_sensor_data(a...; sensor_noise=zero(ystar))
     f
 end
 
-function plot_sensors!(ax,obs::PressureObservations;kwargs...)
+function plot_sensors!(ax,obs::AbstractObservationOperator{Nx,Ny,true};kwargs...) where {Nx,Ny}
     scatter!(ax,real.(obs.sens),imag.(obs.sens);marker=:rect,color=:black,kwargs...)
 end
 

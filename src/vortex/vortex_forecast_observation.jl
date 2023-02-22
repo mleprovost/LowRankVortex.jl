@@ -7,6 +7,9 @@ export VortexForecast, SymmetricVortexForecast, VortexPressureObservations,
 #import TransportBasedInference: Parallel, Serial, Thread # These should not be necessary
 
 
+#### FORECAST OPERATORS ####
+
+
 struct VortexForecast{Nx,withfreestream,CVT} <: AbstractForecastOperator{Nx}
 		config :: VortexConfig
 		cachevels :: CVT
@@ -127,6 +130,7 @@ function forecast(x::AbstractVector,t,Δt,fdata::CylinderVortexForecast{Nx}) whe
 
 end
 
+#### OBSERVATION OPERATORS ####
 
 abstract type AbstractCartesianVortexObservations{Nx,Ny} <: AbstractObservationOperator{Nx,Ny,true} end
 
@@ -408,11 +412,11 @@ function align_vector_through_flips(μ::AbstractVector,Σ::AbstractMatrix,μref:
 
 		xv, yv = μref[x_ids], μref[y_ids]
 
-		wvec_ref = map((x,y) -> vorticity(x,y,μref,Σref,config),xv,yv)
+		wvec_ref = map((x,y) -> blobfield(x,y,μref,Σref,config),xv,yv)
 
 		max_cos = -Inf
 
-		wvec = map((x,y) -> vorticity(x,y,μ,Σ,config),xv,yv)
+		wvec = map((x,y) -> blobfield(x,y,μ,Σ,config),xv,yv)
 		plus_cos = wvec'*wvec_ref
 
 		μ_minus = copy(μ)
@@ -424,7 +428,7 @@ function align_vector_through_flips(μ::AbstractVector,Σ::AbstractMatrix,μref:
 		Σ_minus[Γ_ids,x_ids] = -Σ_minus[Γ_ids,x_ids]
 		Σ_minus[Γ_ids,y_ids] = -Σ_minus[Γ_ids,y_ids]
 
-		wvec = map((x,y) -> vorticity(x,y,μ_minus,Σ,config),xv,yv)
+		wvec = map((x,y) -> blobfield(x,y,μ_minus,Σ,config),xv,yv)
 		minus_cos = wvec'*wvec_ref
 
 		μ_max = plus_cos > minus_cos ? μ : μ_minus
@@ -442,7 +446,8 @@ function align_vector_through_flips!(X::AbstractMatrix,Σ::Vector,refcol,config:
     return X, Σ
 end
 
-# Localization
+### LOCALIZATION ###
+
 function dobsobs(obs::AbstractCartesianVortexObservations{Nx,Ny}) where {Nx,Ny}
 		@unpack sens, config = obs
     dYY = zeros(Ny, Ny)

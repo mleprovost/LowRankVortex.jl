@@ -15,6 +15,10 @@ using Distributions
 using Combinatorics
 using UnPack
 
+abstract type AbstractConfig end
+abstract type SingularityConfig <: AbstractConfig end
+
+
 
 include("ensemble.jl")
 include("forecast.jl")
@@ -31,6 +35,8 @@ include("vortex/vortex.jl")
 include("vortex/vortex_clusters.jl")
 include("vortex/vortex_forecast_observation.jl")
 include("vortex/vortex_inference.jl")
+
+include("potentials.jl")
 
 include("pressure/convective_complexpotential.jl")
 include("pressure/pressure.jl")
