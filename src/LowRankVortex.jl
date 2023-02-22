@@ -36,7 +36,7 @@ include("vortex/vortex_clusters.jl")
 include("vortex/vortex_forecast_observation.jl")
 include("vortex/vortex_inference.jl")
 
-include("potentials.jl")
+include("potential/potentials.jl")
 
 include("pressure/convective_complexpotential.jl")
 include("pressure/pressure.jl")
