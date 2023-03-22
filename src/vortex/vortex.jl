@@ -1,5 +1,5 @@
 export VortexConfig, state_to_lagrange, lagrange_to_state, state_length, construct_vortex_state_mapping,
-          state_to_positions_and_strengths, positions_and_strengths_to_state,
+          state_to_positions_and_strengths, positions_and_strengths_to_state, get_config_and_state,
           state_to_singularity_states, states_to_singularity_states, state_covariance,create_state_bounds,
           number_of_singularities, vorticity, get_singularity_ids
 
@@ -162,6 +162,15 @@ state_length(a::Int) = 0
 
 
 number_of_singularities(config::VortexConfig) = config.Nv
+
+function get_config_and_state(zv::AbstractVector,Γv::AbstractVector;δ = 0.01,body=LowRankVortex.NoWall)
+    Nv = length(zv)
+    config = VortexConfig(Nv, δ, body=body)
+    x = positions_and_strengths_to_state(zv,Γv,config)
+
+    return config, x
+end
+
 
 
 "A routine to convert the state from a vector representation (State representation) to a set of vortex blobs and their mirrored images (Lagrangian representation).

@@ -384,18 +384,15 @@ function flip_symmetry_state_filter!(x, config::VortexConfig)
 	y_ids = state_id["vortex y"]
 	Γ_ids = state_id["vortex Γ"]
 
-
 	# Flip the sign of vorticity if it is negative on average
 	Γtot = sum(x[Γ_ids])
 	x[Γ_ids] .= Γtot < 0 ? -x[Γ_ids] : x[Γ_ids]
-
 
 	# Sort the vortices by strength to try to ensure they don't take each other's role
 	id_sort = sortperm(x[Γ_ids])
 	x[x_ids] .= x[x_ids[id_sort]]
 	x[y_ids] .= x[y_ids[id_sort]]
 	x[Γ_ids] .= x[Γ_ids[id_sort]]
-
 
 	# Make all y locations positive
 	#x[y_ids] = abs.(x[y_ids])

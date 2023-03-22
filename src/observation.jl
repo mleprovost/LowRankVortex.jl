@@ -5,7 +5,7 @@
 # Nx is number of states, Ny is number of observations
 
 export observations!, observations, AbstractObservationOperator, jacob!,
-       state_filter!, normal_loglikelihood, log_uniform
+       state_filter!, normal_loglikelihood, log_uniform, measurement_length, state_length
 
 abstract type AbstractObservationOperator{Nx,Ny,withsensors} end
 

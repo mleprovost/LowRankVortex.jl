@@ -65,6 +65,8 @@ end
 
 generate_random_states(nstates,a...) = [generate_random_state(a...) for i in 1:nstates]
 
+generate_random_state(bounds::Vector,config::SingularityConfig) = generate_random_state(bounds[1:3]...,config)
+
 
 """
     createclusters(Nclusters,Npercluster,xr::Tuple,yr::Tuple,Γr::Tuple,σx,σΓ;body=nothing,each_cluster_radius=0.0) -> Vector{ComplexF64}, Vector{Float64}

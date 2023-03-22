@@ -41,9 +41,12 @@ function data_histogram(x::Vector{T};bins=80,xlims = (-2,2), kwargs...) where {T
 end
 
 
-function show_singularities!(ax,x::Vector,obs::AbstractObservationOperator)
+function show_singularities!(ax,x::Vector,obs::AbstractObservationOperator;kwargs...)
     sing_array = state_to_singularity_states(x,obs.config)
-    scatter!(ax,sing_array[1,:],sing_array[2,:])
+    bluered = range(colorant"darkorange1",colorant"cornflowerblue",length=2)
+    colormap = cgrad(bluered,0.25,categorical=true)
+    sgns = sign.(sing_array[3,:])
+    scatter!(ax,sing_array[1,:],sing_array[2,:];colormap=colormap,color=sgns,kwargs...)
 end
 
 """
@@ -59,7 +62,7 @@ function show_singularities(x::Vector,obs::AbstractObservationOperator;kwargs...
 end
 
 
-function show_singularity_samples!(ax,x_samples::Array,obs::AbstractObservationOperator;nskip=1,kwargs...)
+function show_singularity_samples!(ax,x_samples::Union{Array,BasicEnsembleMatrix},obs::AbstractObservationOperator;nskip=1,kwargs...)
     sing_array = states_to_singularity_states(x_samples[:,1:nskip:end],obs.config)
     sgns = sign.(sing_array[3,:])
     bluered = range(colorant"lightsalmon",colorant"lightskyblue1",length=2)
@@ -194,13 +197,13 @@ function plot_potential_field(x::Vector,obs::PotentialObservations; kwargs...)
 end
 
 function plot_pressure_field!(ax,xg::AbstractVector,yg::AbstractVector,p::Matrix,obs::AbstractObservationOperator; levels = range(-0.5,0.01,length=21), kwargs...)
-    contour!(ax,xg,yg,p,levels=levels,colormap=:RdBu)
-    plot_sensors!(ax,obs)
+    contour!(ax,xg,yg,p;levels=levels, kwargs...)
+    #plot_sensors!(ax,obs)
 end
 
 function plot_potential_field!(ax,xg::AbstractVector,yg::AbstractVector,p::Matrix,obs::AbstractObservationOperator; levels = range(-0.5,0.01,length=21), kwargs...)
-    contour!(ax,xg,yg,p,levels=levels,colormap=:RdBu)
-    plot_sensors!(ax,obs)
+    contour!(ax,xg,yg,p;levels=levels, kwargs...)
+    #plot_sensors!(ax,obs)
 end
 
 function plot_sensor_data!(ax,ystar::Vector,x::Vector,t::Real,obs::AbstractObservationOperator; sensor_noise=zero(ystar))

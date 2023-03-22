@@ -49,6 +49,8 @@ include("pressure/jacobian.jl")
 include("pressure/pressure_decomposed.jl")
 include("pressure/cylinder_analytical_jacobian_pressure.jl")
 
+include("experiments/routines.jl")
+
 
 
 include("plot_recipes.jl")

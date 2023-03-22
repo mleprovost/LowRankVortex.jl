@@ -5,7 +5,8 @@ import Statistics: cov, mean, std, var
 import LinearAlgebra: norm
 
 export BasicEnsembleMatrix, create_ensemble, ensemble_perturb, whiten,
-        additive_inflation!, multiplicative_inflation!, draw_sample
+        additive_inflation!, multiplicative_inflation!, draw_sample, ensemble_size,
+        downsample_ensemble
 
 abstract type EnsembleMatrix{Nx,Ne,T} <: AbstractMatrix{T} end
 
@@ -42,8 +43,20 @@ length(X::EnsembleMatrix) = length(X.X)
 getindex(X::EnsembleMatrix,i) = getindex(X.X,i)
 getindex(X::EnsembleMatrix,I...) = getindex(X.X,I...)
 eltype(X::EnsembleMatrix) = eltype(X.X)
+ensemble_size(X::EnsembleMatrix{Nx,Ne}) where {Nx,Ne} = Ne
 
 
+
+"""
+    downsample_ensemble(X::BasicEnsembleMatrix,nskip) -> EnsembleMatrix
+
+Return a new ensemble with every `nskip`th entry of `X`, starting with 1.
+`nskip` must be between 1 and ensemble_size(X)
+"""
+function downsample_ensemble(X::BasicEnsembleMatrix,nskip::Int)
+  1 <= nskip <= ensemble_size(X) || error("nskip is inappropriate size")
+  return BasicEnsembleMatrix(X[:,1:nskip:end])
+end
 
 
 

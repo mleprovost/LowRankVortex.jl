@@ -1,6 +1,9 @@
 export vortexinference, adaptive_lowrank_enkf!, senkf!
 
-
+#=
+These routines are a bit outdated and need to be brought up
+to date with the observation/forecast structure.
+=#
 
 """
     vortexinference(ystar,xr::Tuple,yr::Tuple,Γr::Tuple,ϵmeas,ϵx,ϵy,ϵΓ,obs
