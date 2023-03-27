@@ -132,10 +132,11 @@ function singularity_ellipses!(ax,μ::Vector{T},Σ,obs::AbstractObservationOpera
     end
 end
 
-function singularity_ellipses!(ax,μ::AbstractMatrix{T},Σ,wts,obs::AbstractObservationOperator; kwargs...) where {T<:Real}
+function singularity_ellipses!(ax,μ::AbstractMatrix{T},Σ,wts,obs::AbstractObservationOperator; threshold = 0.05, kwargs...) where {T<:Real}
   id_sort = sortperm(wts,rev=true)
   for c in 1:size(μ,2)
       id = id_sort[c]
+      wts[id] < threshold && continue
       singularity_ellipses!(ax,μ[:,id],Σ[id],obs;color=Cycled(c),linewidth=1.5wts[id]^2/maximum(wts.^2),kwargs...)
   end
 end

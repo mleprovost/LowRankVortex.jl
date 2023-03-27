@@ -32,6 +32,7 @@ function get_truth_data(Nsens,ϵmeas,x_true::Vector,config_true::SingularityConf
     H = zeros(Nsens,state_length(config_true))
     jacob!(H,x_true,t,obs_true)
 
+    #Σx = H'*inv(Σϵ)*H
     Σx = inv(H'*inv(Σϵ)*H)
 
     return obs_true, ystar, H, Σϵ, Σx
