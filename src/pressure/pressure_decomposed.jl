@@ -105,9 +105,22 @@ function analytical_dpdzv(z,l::Integer,v::Vector{T};kwargs...) where {T<:Union{P
         return Γl*out
 end
 
+# Change of pressure with respect to change of blob radius of vortex l
+function analytical_dpdϵ(z,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}}
+        zl,Γl  = Elements.position(v[l]), strength(v[l])
+        out = -0.5*Γl*dPdϵ(z,zl;kwargs...)
+        for (k,vk) in enumerate(v)
+            k == l && continue
+            zk,Γk  = Elements.position(vk), strength(vk)
+            out -= Γk*dΠdϵl(z,zl,zk;kwargs...)
+        end
+        return Γl*out
+end
+
 analytical_pressure(z::AbstractArray,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> analytical_pressure(zj,v;kwargs...),z)
 analytical_dpdzv(z::AbstractArray,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> analytical_dpdzv(zj,l,v;kwargs...),z)
 analytical_dpdΓv(z::AbstractArray,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> analytical_dpdΓv(zj,l,v;kwargs...),z)
+analytical_dpdϵ(z::AbstractArray,l::Integer,v::Vector{T};kwargs...) where {T<:Union{PotentialFlow.Points.Point,PotentialFlow.Blobs.Blob}} = map(zj -> analytical_dpdϵ(zj,l,v;kwargs...),z)
 
 
 analytical_pressure(z,v,::Nothing;kwargs...) = analytical_pressure(z,v;kwargs...)
@@ -135,8 +148,10 @@ dwvddz(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _dwvddz(z,zv,ϵ)
 dwvddzstar(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _dwvddzstar(z,zv,ϵ)
 dwvidz(z,zv;walltype=NoWall,kwargs...) = _dwvidz(z,zv,walltype)
 dwvdz(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = _dwvddz(z,zv,ϵ) + _dwvidz(z,zv,walltype)
+dwvdϵ(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = _dwvddϵ(z,zv,ϵ)
 _dwvddz(z,zv,ϵ) = 0.5im*conj(z-zv)^2/π/(abs2(z-zv) + ϵ^2)^2
 _dwvddzstar(z,zv,ϵ) = -0.5im*ϵ^2/π/(abs2(z-zv) + ϵ^2)^2
+_dwvddϵ(z,zv,ϵ) = im*ϵ*conj(z-zv)/π/(abs2(z-zv) + ϵ^2)^2
 _dwvidz(z,zv,::Type{NoWall}) = complex(0.0)
 _dwvidz(z,zv,::Type{FlatWall}) = -_dwvddz(z,conj(zv),0.0)
 _dwvidz(z,zv,::Type{Cylinder}) = -0.5im/π*(1/(z-1/conj(zv))^2-1/z^2)
@@ -156,7 +171,9 @@ _dwvidzvstar(z,zv,::Type{Cylinder}) = -0.5im/π/conj(zv)^2/(z-1/conj(zv))^2
 dFddzv(z,zv;ϵ=EPSILON_DEFAULT,kwargs...) = _dFddzv(z,zv,ϵ)
 dFidzvstar(z,zv;walltype=NoWall,kwargs...) = _dFidzvstar(z,zv,walltype)
 dFdzv(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = _dFddzv(z,zv,ϵ) + conj(_dFidzvstar(z,zv,walltype))
+d2Fdzvdϵ(z,zv;ϵ=EPSILON_DEFAULT,walltype=NoWall) = _d2Fddzvdϵ(z,zv,ϵ)
 _dFddzv(z,zv,ϵ) = -_wvd(z,zv,ϵ)
+_d2Fddzvdϵ(z,zv,ϵ) = -_dwvddϵ(z,zv,ϵ)
 _dFidzvstar(z,zv,::Type{NoWall}) = complex(0.0)
 _dFidzvstar(z,zv,::Type{FlatWall}) = -_dFddzv(z,conj(zv),0.0)
 _dFidzvstar(z,zv,::Type{Cylinder}) = 0.5im/π/conj(zv)^2/(z-1/conj(zv))
@@ -184,6 +201,14 @@ dPdzv(z,zv;kwargs...) = (dwvddzv(z,zv;kwargs...)*conj(wv(z,zv;kwargs...)) + wv(z
 dΠdzvl(z,zvl,zvk;kwargs...) = 0.5*(dwvddzv(z,zvl;kwargs...)*conj(wv(z,zvk;kwargs...)) + conj(dwvddzvstar(z,zvl;kwargs...)+dwvidzvstar(z,zvl;kwargs...))*wv(z,zvk;kwargs...)) +
                                0.5*(d2Fdzv2(z,zvl;kwargs...)*conj(wv(zvl,zvk;kwargs...)) + dFdzv(z,zvl;kwargs...)*conj(dwvddzstar(zvl,zvk;kwargs...)) + conj(d2Fddzvdvzstar(z,zvl;kwargs...))*wv(zvl,zvk;kwargs...)  + conj(dFdzv(z,zvl;kwargs...))*dwvdz(zvl,zvk;kwargs...)) +
                                0.5*(dFdzv(z,zvk;kwargs...)*conj(dwvdzvstar(zvk,zvl;kwargs...)) + conj(dFdzv(z,zvk;kwargs...))*dwvddzv(zvk,zvl;kwargs...))
+
+dPdϵ(z,zv;kwargs...) = 2real(dwvdϵ(z,zv;kwargs...)*conj(wv(z,zv;kwargs...))) +
+                       2real(d2Fdzvdϵ(z,zv;kwargs...)*conj(wvi(zv,zv;kwargs...)))
+
+
+dΠdϵl(z,zvl,zvk;kwargs...) = real(dwvdϵ(z,zvl;kwargs...)*conj(wv(z,zvk;kwargs...)) + wv(z,zvl;kwargs...)*conj(dwvdϵ(z,zvk;kwargs...))) +
+                            real(d2Fdzvdϵ(z,zvl;kwargs...)*conj(wv(zvl,zvk;kwargs...))) +
+                            real(dFdzv(z,zvk;kwargs...)*conj(dwvdϵ(zvk,zvl;kwargs...)))
 
 for f in [:F,:w]
 

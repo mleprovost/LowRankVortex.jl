@@ -63,11 +63,19 @@ function analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, s
 		J[:,Γ_ids[i]] .= dpdΓi
 	end
 
+	if haskey(state_id,"vortex ϵ")
+		ϵ_ids = state_id["vortex ϵ"]
+		for i = 1:Nv
+			J[:,ϵ_ids[i]] = analytical_dpdϵ(target, i, source; kwargs...)
+		end
+	end
+
 	inv_T = state_id["vortex Γ inverse transform"]
 	J[:,Γ_ids] = J[:,Γ_ids]*inv_T
 
 	return J
 end
+
 
 analytical_pressure_jacobian!(J,target::AbstractVector{<:ComplexF64}, source::Vector{T}, ::Nothing, state_id; kwargs...) where T <: PotentialFlow.Element =
 		analytical_pressure_jacobian!(J,target,source,state_id;kwargs...)

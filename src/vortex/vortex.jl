@@ -56,13 +56,13 @@ struct VortexConfig{WT,BT,SID} <: SingularityConfig
 
 end
 
-function VortexConfig(Nv,U,Δt,δ;advect_flag=true,body=nothing)
-  state_id = construct_vortex_state_mapping(Nv,body)
+function VortexConfig(Nv,U,Δt,δ;advect_flag=true,body=nothing,blobstate=false)
+  state_id = construct_vortex_state_mapping(Nv,body,Val(blobstate))
   VortexConfig{_walltype(body),typeof(body),typeof(state_id)}(Nv,state_id,body,U,Δt,δ,advect_flag)
 end
 
-function VortexConfig(Nv,δ;body=nothing)
-  state_id = construct_vortex_state_mapping(Nv,body)
+function VortexConfig(Nv,δ;body=nothing,blobstate=false)
+  state_id = construct_vortex_state_mapping(Nv,body,Val(blobstate))
   VortexConfig{_walltype(body),typeof(body),typeof(state_id)}(Nv,state_id,body,complex(0.0),0.0,δ,false)
 end
 
@@ -71,8 +71,9 @@ _walltype(body) = body
 
 
 # Mapping from vortex elements and other degrees of freedom to the state components
-construct_vortex_state_mapping(Nv,body) = construct_vortex_state_mapping(Nv)
-construct_vortex_state_mapping(Nv,::Bodies.ConformalBody) = construct_vortex_state_mapping_conformal(Nv)
+construct_vortex_state_mapping(Nv,body,::Val{false}) = construct_vortex_state_mapping(Nv)
+construct_vortex_state_mapping(Nv,::Bodies.ConformalBody,::Val{false}) = construct_vortex_state_mapping_conformal(Nv)
+construct_vortex_state_mapping(Nv,body,::Val{true}) = construct_vortex_state_mapping_with_blobs(Nv)
 
 
 function construct_vortex_state_mapping(Nv::Int64)
@@ -88,6 +89,38 @@ function construct_vortex_state_mapping(Nv::Int64)
   state_id["vortex x"] = vortex_x_ids
   state_id["vortex y"] = vortex_y_ids
   state_id["vortex Γ"] = vortex_Γ_ids
+
+  state_id["vortex Γ total"] = vortex_Γ_ids[1]
+
+  # Create the strength transform matrix
+  #  T maps actual strengths to states
+  #  inv T maps states to actual strengths
+  Tmat = _strength_transform_matrix_identity(Nv)
+  #Tmat = _strength_transform_matrix_sum(Nv)
+
+
+  state_id["vortex Γ transform"] = Tmat
+  state_id["vortex Γ inverse transform"] = inv(Tmat)
+
+  return state_id
+end
+
+function construct_vortex_state_mapping_with_blobs(Nv::Int64)
+  state_id = Dict()
+  vortex_x_ids = zeros(Int,Nv)
+  vortex_y_ids = zeros(Int,Nv)
+  vortex_Γ_ids = zeros(Int,Nv)
+  vortex_ϵ_ids = zeros(Int,Nv)
+  for j in 1:Nv
+    vortex_x_ids[j] = 4j-3
+    vortex_y_ids[j] = 4j-2
+    vortex_Γ_ids[j] = 4j-1
+    vortex_ϵ_ids[j] = 4j
+  end
+  state_id["vortex x"] = vortex_x_ids
+  state_id["vortex y"] = vortex_y_ids
+  state_id["vortex Γ"] = vortex_Γ_ids
+  state_id["vortex ϵ"] = vortex_ϵ_ids
 
   state_id["vortex Γ total"] = vortex_Γ_ids[1]
 
@@ -163,9 +196,9 @@ state_length(a::Int) = 0
 
 number_of_singularities(config::VortexConfig) = config.Nv
 
-function get_config_and_state(zv::AbstractVector,Γv::AbstractVector;δ = 0.01,body=LowRankVortex.NoWall)
+function get_config_and_state(zv::AbstractVector,Γv::AbstractVector;δ = 0.01,body=LowRankVortex.NoWall,blobstate=false)
     Nv = length(zv)
-    config = VortexConfig(Nv, δ, body=body)
+    config = VortexConfig(Nv, δ, body=body, blobstate=blobstate)
     x = positions_and_strengths_to_state(zv,Γv,config)
 
     return config, x
@@ -320,12 +353,14 @@ function state_to_positions_and_strengths(state::AbstractVector{Float64}, config
 end
 
 function positions_and_strengths_to_state(zv::AbstractVector{ComplexF64},Γv::AbstractVector{Float64},config::VortexConfig)
-  @unpack Nv, state_id = config
+  @unpack Nv, state_id, δ = config
   state = zeros(state_length(state_id))
 
   x_ids = state_id["vortex x"]
   y_ids = state_id["vortex y"]
   Γ_ids = state_id["vortex Γ"]
+
+
   Tmat = state_id["vortex Γ transform"]
 
   Γv_transform = Tmat*Γv
@@ -335,6 +370,12 @@ function positions_and_strengths_to_state(zv::AbstractVector{ComplexF64},Γv::Ab
     state[y_ids[i]] = imag(zv[i])
     state[Γ_ids[i]] = Γv_transform[i]
   end
+
+  if haskey(state_id,"vortex ϵ")
+    ϵ_ids = state_id["vortex ϵ"]
+    state[ϵ_ids] .= δ
+  end
+
   return state
 end
 

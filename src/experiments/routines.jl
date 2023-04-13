@@ -29,11 +29,12 @@ function get_truth_data(Nsens,ϵmeas,x_true::Vector,config_true::SingularityConf
         ystar += rand(noisedist)
     end
 
-    H = zeros(Nsens,state_length(config_true))
+    n = state_length(config_true)
+    H = zeros(Nsens,n)
     jacob!(H,x_true,t,obs_true)
 
-    #Σx = H'*inv(Σϵ)*H
-    Σx = inv(H'*inv(Σϵ)*H)
+    invΣx = H'*inv(Σϵ)*H
+    Σx = rank(invΣx) == n ? inv(invΣx) : Matrix{Float64}(undef,n,n)
 
     return obs_true, ystar, H, Σϵ, Σx
 
@@ -54,6 +55,11 @@ function setup_sensors(Nsens;layout=(:line,1.0))
     #leftside = im*range(-1.0,3.0,length=Nsens) .- 1.0
     #rightside = im*range(-1.0,3.0,length=Nsens) .+ 1.0
     sens = vcat(lowerrow,)  #upperrow);
+  elseif layout_type == :dline
+    ϵsens = 0.02
+    lowerrow1 = range(-len,len,length=Nsens÷2) .- 0.5*ϵsens
+    lowerrow2 = range(-len,len,length=Nsens÷2) .+ 0.5*ϵsens
+    sens = sort(vcat(lowerrow1,lowerrow2)) .+ 0.0im
   end
   return sens
 end

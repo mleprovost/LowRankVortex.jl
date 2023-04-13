@@ -3,6 +3,7 @@ using ColorTypes
 #using MakieCore
 using LaTeXStrings
 using CairoMakie
+import CairoMakie.GeometryBasics: Point2f
 
 export color_palette
 export draw_ellipse!
@@ -10,7 +11,8 @@ export data_histogram, show_singularities, show_singularities!, show_singularity
         show_singularity_samples!, plot_expected_sourcefield, plot_expected_sourcefield!, singularity_ellipses,
         singularity_ellipses!, plot_pressure_field, plot_pressure_field!,
         plot_potential_field, plot_potential_field!, plot_sensor_data,
-        plot_sensor_data!, plot_sensors!
+        plot_sensor_data!, plot_sensors!, draw_ellipse_x!, draw_ellipse_y!, draw_ellipse_z!,
+        draw_ellipsoid!,get_ellipse_coords
 
 """
 A palette of colors for plotting
@@ -238,13 +240,59 @@ function plot_sensors!(ax,obs::AbstractObservationOperator{Nx,Ny,true};kwargs...
     scatter!(ax,real.(obs.sens),imag.(obs.sens);marker=:rect,color=:black,kwargs...)
 end
 
-function draw_ellipse!(ax,μ::Vector,Σ::AbstractMatrix;kwargs...)
+
+function draw_ellipse!(ax,μ::Vector,Σ::AbstractMatrix;fill=false,kwargs...)
+    xe, ye = get_ellipse_coords(μ,Σ)
+    _draw_ellipse!(ax,xe,ye,Val(fill);kwargs...)
+end
+
+function _draw_ellipse!(ax,xe,ye,::Val{false};kwargs...)
+    lines!(ax,xe,ye;marker=:none,kwargs...)
+end
+
+function _draw_ellipse!(ax,xe,ye,::Val{true};color=:red,kwargs...)
+    pts = Point2f[(x,y) for (x,y) in zip(xe,ye)]
+    poly!(ax,pts;kwargs...)
+end
+
+function draw_ellipse_x!(ax,μ::Vector,Σ::AbstractMatrix,z;kwargs...)
+    xe, ye = get_ellipse_coords(μ,Σ)
+    lines!(ax,z*ones(length(xe)),xe,ye;marker=:none,kwargs...)
+end
+
+function draw_ellipse_y!(ax,μ::Vector,Σ::AbstractMatrix,z;kwargs...)
+    xe, ye = get_ellipse_coords(μ,Σ)
+    lines!(ax,ye,z*ones(length(xe)),xe;marker=:none,kwargs...)
+end
+
+function draw_ellipse_z!(ax,μ::Vector,Σ::AbstractMatrix,z;kwargs...)
+    xe, ye = get_ellipse_coords(μ,Σ)
+    lines!(ax,xe,ye,z*ones(length(xe));marker=:none,kwargs...)
+end
+
+function get_ellipse_coords(μ::Vector,Σ::AbstractMatrix)
     θ = range(0,2π,length=100)
     xc, yc = cos.(θ), sin.(θ)
     sqrtΣ = sqrt(Σ)
     xell = μ[1] .+ sqrtΣ[1,1]*xc .+ sqrtΣ[1,2]*yc
     yell = μ[2] .+ sqrtΣ[2,1]*xc .+ sqrtΣ[2,2]*yc
-    lines!(ax,xell,yell;marker=:none,kwargs...)
+    return xell, yell
+end
+
+function draw_ellipsoid!(ax,μ::Vector,Σ::AbstractMatrix;kwargs...)
+    (size(Σ) == (3,3) && length(μ) == 3) || error("Must be 3-dimensional state")
+    s = svd(Σ)
+    a,b,c = sqrt.(s.S)
+
+    US = s.U*Diagonal([a,b,c])
+    M(u,v) = [a*cos(u)*sin(v), b*sin(u)*sin(v), c*cos(v)]
+    RM(u,v) = s.U * M(u,v) .+ μ
+
+    u, v = range(0, 2π, length=72), range(0, π, length=72)
+    xs, ys, zs = [[p[i] for p in RM.(u, v')] for i in 1:3]
+
+    surface!(ax,xs,ys,zs; kwargs...)
+
 end
 
 #=
