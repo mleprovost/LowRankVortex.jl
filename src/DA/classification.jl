@@ -4,6 +4,7 @@ using GaussianMixtures
 export classify_by_data_mismatch, classify_by_density, classify_by_gmm, find_gmm,
         means_and_covariances
 
+
 """
     find_gmm(K,logp̃,obs,xseed,Ntrial,propvar[;nchain=5,nskip=100])
 
