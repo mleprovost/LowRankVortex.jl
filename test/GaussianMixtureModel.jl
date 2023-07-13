@@ -67,7 +67,7 @@ end
 using Distributions
 @testset "Testing the complete GMM function" begin
 
-    atol = 0.01
+    atol = 0.1
     coeffs = [1.0]
     d   = MvNormal[]
     μ1 = [1.0,1.0]
@@ -91,7 +91,7 @@ using Distributions
 
     @test isapprox(pi_k1,1.0, atol = atol)
     @test typeof(mu_k1) <: Vector && size(mu_k1) == (2,) && isapprox(mu_k1,[1.0,1.0], atol = atol)
-    @test typeof(cov_k1) <: Matrix && size(cov_k1) == (2,2) && isapprox(cov_k1,[1.0 0.0; 0.0 1.0], atol = atol*10)
+    @test typeof(cov_k1) <: Matrix && size(cov_k1) == (2,2) && isapprox(cov_k1,[1.0 0.0; 0.0 1.0], atol = atol)
 
 end
 

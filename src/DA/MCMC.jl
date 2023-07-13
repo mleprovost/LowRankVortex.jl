@@ -40,9 +40,9 @@ end
 
 function metropolis(zi::Vector{Vector{T}},nsamp::Integer,logp̃::Function,propvars::Vector{S};burnin=max(1,floor(Int,nsamp/2)),
                                                                                             β = ones(length(zi)),
-                                                                                            process_state = x -> x,k=1,sparsity=100,tolerance=0.0001,update_mean=1000) where {T <: Float64, S}
+                                                                                            process_state = x -> x,k=1,sparsity=100,tolerance=0.0001,batch_size=1000) where {T <: Float64, S}
 
-    x_data, accept_data, logp_data, swaps, swapaccepts = _metropolis(zi,nsamp,logp̃,propvars,burnin,β,process_state,k,sparsity,tolerance,update_mean)
+    x_data, accept_data, logp_data, swaps, swapaccepts = _metropolis(zi,nsamp,logp̃,propvars,burnin,β,process_state,k,sparsity,tolerance,batch_size)
     x_ens = [BasicEnsembleMatrix(x) for x in x_data]
 
 
@@ -85,7 +85,7 @@ metropolis(chains::MetropolisSolution,nsamp::Integer,logp̃,propvar;β = 5.0.^(r
       metropolis([copy(x[:,end]) for x in chains.data],nsamp,logp̃,[propvar/β[i] for i = 1:numchains(chains)];β = β,kwargs...)
 
 
- function _metropolis(zi::Vector{Vector{T}},nsamp::Integer,logp̃::Function,propvars::Vector{S},burnin,β,process_state,k,sparsity,tolerance,update_mean) where {T <: Float64, S}
+ function _metropolis(zi::Vector{Vector{T}},nsamp::Integer,logp̃::Function,propvars::Vector{S},burnin,β,process_state,k,sparsity,tolerance,batch_size) where {T <: Float64, S}
       nchain = length(zi)
       n = length(first(zi))
       z_data = [zeros(n,nsamp-burnin+1) for j in 1:nchain]
@@ -107,7 +107,7 @@ metropolis(chains::MetropolisSolution,nsamp::Integer,logp̃,propvar;β = 5.0.^(r
           logp_data[j][1] = β[j]*logp̃(z)
       end
 
-      for i in 2:update_mean
+      for i in 2:batch_size
           for j = 1:nchain
               z, accept = mhstep(z_data[j][:,i-1],logp̃,propvars[j],β[j])
               newz = process_state(copy(z))
@@ -117,9 +117,9 @@ metropolis(chains::MetropolisSolution,nsamp::Integer,logp̃,propvar;β = 5.0.^(r
           end
       end
 
-      i=update_mean
+      i=batch_size
 
-      old_clusters=new_GMM(k,z_data[1][:,1:update_mean])
+      old_clusters=new_GMM(k,z_data[1][:,1:batch_size])
       new_clusters=init_gmm(k,ones(2,100).*10^6)
 
       convergence_check=true
@@ -127,16 +127,16 @@ metropolis(chains::MetropolisSolution,nsamp::Integer,logp̃,propvar;β = 5.0.^(r
 
       while(i<(nsamp-burnin+1) && convergence_check)
 
-        if(i%update_mean==0)
+        if(i%batch_size==0)
 
           new_clusters = deepcopy(old_clusters)
           new_clusters = new_GMM2(new_clusters,z_data[1][:,1:sparsity:i])
 
-          convergence_check=convergence_checks(old_clusters,new_clusters,tolerance)
+          convergence_check,kl_div=convergence_checks(old_clusters,new_clusters,tolerance)
 
           println("Total Iterations: $i")
           #println("Norm : $(norm(new_mean-old_mean))")
-          println("KL DIV : $(KL_div_clusters(old_clusters,new_clusters))")
+          println("KL DIV : $kl_div")
 
           old_clusters .= new_clusters
 
@@ -187,11 +187,11 @@ metropolis(chains::MetropolisSolution,nsamp::Integer,logp̃,propvar;β = 5.0.^(r
 
 
   function convergence_checks(old_clusters,new_clusters,tolerance)
-
-      if(KL_div_clusters(old_clusters,new_clusters)<tolerance)
-          return false
+      kl_div = KL_div_clusters(old_clusters,new_clusters)
+      if(kl_div<tolerance)
+          return false,kl_div
       else
-          return true
+          return true,kl_div
       end
   end
 
