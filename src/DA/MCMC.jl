@@ -366,11 +366,11 @@ end
 function get_means(clusters)
     # extract all the means from the GMM dictionary
     K = length(clusters)
-    means= zeros(0)
+    means= Vector{Float64}[]
 
     for k in range(1,K)
         mu_k = clusters[k]["mu_k"]
-        append!(means, mu_k)
+        push!(means, mu_k)
     end
    return means
 end
