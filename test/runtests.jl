@@ -15,6 +15,7 @@ import PotentialFlow.Elements: jacobian_position, jacobian_strength, jacobian_pa
 const GROUP = get(ENV, "GROUP", "All")
 
 
+
 if GROUP == "All" || GROUP == "Ensemble"
   include("ensemble.jl")
 end
@@ -33,4 +34,5 @@ if GROUP == "All" || GROUP == "Pressure"
   include("symmetric_analytical_jacobian_pressure.jl")
   include("AD_pressure.jl")
   include("cylinder_analytical_jacobian_pressure.jl")
+  include("GaussianMixtureModel.jl")
 end

@@ -1,6 +1,6 @@
 #using RecipesBase
 using ColorTypes
-#using MakieCore
+using MakieCore
 using LaTeXStrings
 using CairoMakie
 import CairoMakie.GeometryBasics: Point2f
